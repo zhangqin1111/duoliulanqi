@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>滤镜 · 多源大模型内容对比与分析</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workbench">
+        <div class="workbench-inner">
+          <section class="conversation-pane">
+            <header class="pane-topbar">
+              <div class="brand-lockup">
+                <div class="brand-mark" aria-hidden="true">
+                  <span></span>
+                </div>
+                <div>
+                  <p class="brand-eyebrow">多源大模型内容对比与分析</p>
+                  <h1>滤镜工作台</h1>
+                </div>
+              </div>
+              <div class="toolbar-actions">
+                <button type="button" id="btnReload" class="toolbar-btn">一键刷新</button>
+                <button type="button" id="btnSettings" class="toolbar-btn">API 设置</button>
+              </div>
+            </header>
+
+            <section class="pane-meta">
+              <div class="meta-pills">
+                <label class="meta-pill">
+                  <input type="checkbox" id="chk-reply-idle" checked />
+                  <span>等待长回复稳定后再判定完成</span>
+                </label>
+                <label class="meta-pill">
+                  <input type="checkbox" id="chk-auto-summarize" checked />
+                  <span>发送后自动生成结构化对比</span>
+                </label>
+              </div>
+              <p id="status" class="status" aria-live="polite"></p>
+            </section>
+
+            <div id="settings-panel" class="settings-inline" hidden>
+              <div class="settings-head">
+                <div>
+                  <h2 class="settings-inline-title">DashScope Key</h2>
+                  <p class="settings-inline-desc">
+                    结构化对比摘要由 DashScope API 生成。设置面板固定在左栏，避免被右侧 BrowserView 遮挡。
+                  </p>
+                </div>
+                <button type="button" id="settings-close" class="toolbar-btn">收起</button>
+              </div>
+              <p id="settings-key-source" class="settings-source" aria-live="polite"></p>
+              <label for="dashscope-key">DashScope API Key</label>
+              <input
+                id="dashscope-key"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                class="settings-input"
+                placeholder="粘贴密钥后保存"
+              />
+              <div class="settings-actions">
+                <button type="button" id="settings-save" class="primary">保存</button>
+                <button type="button" id="settings-clear" class="ghost">清除本地文件</button>
+              </div>
+              <p id="settings-msg" class="settings-msg" role="status"></p>
+            </div>
+
+            <section class="thread-surface">
+              <div class="question-chip" id="question-chip">等待输入问题</div>
+
+              <div class="thread-scroll" id="thread-scroll">
+                <article class="result-document">
+                  <div id="mirror-sections" class="mirror-sections"></div>
+
+                  <section class="document-section document-section--summary" aria-labelledby="summary-heading">
+                    <div class="document-head">
+                      <div>
+                        <p class="sheet-kicker">Compare Sheet</p>
+                        <h2 id="summary-heading" class="document-title">结构化对比结果</h2>
+                      </div>
+                      <button type="button" id="btnOpenCompare" class="toolbar-btn">查看对比</button>
+                    </div>
+                    <div class="summary-status-line" id="summary-status"></div>
+                    <pre id="summary-body" class="document-summary">点击“对比”后，这里会展示相同观点和不同观点。</pre>
+                  </section>
+                </article>
+              </div>
+
+              <aside id="compare-panel" class="compare-panel" hidden aria-labelledby="compare-title">
+                <div class="compare-panel__backdrop" data-close-compare="true"></div>
+                <div class="compare-panel__sheet">
+                  <header class="compare-panel__head">
+                    <div>
+                      <p class="compare-panel__eyebrow">Compare Overlay</p>
+                      <h2 id="compare-title">对比内容弹层</h2>
+                    </div>
+                    <button type="button" id="btnCloseCompare" class="toolbar-btn">关闭</button>
+                  </header>
+
+                  <div class="compare-panel__body">
+                    <section class="compare-column compare-column--same">
+                      <div class="compare-column__title">相同观点</div>
+                      <div id="compare-same" class="compare-column__content">暂无内容</div>
+                    </section>
+                    <section class="compare-column compare-column--diff">
+                      <div class="compare-column__title">不同观点</div>
+                      <div id="compare-diff" class="compare-column__content">暂无内容</div>
+                    </section>
+                    <section class="compare-raw">
+                      <div class="compare-column__title">原始回复</div>
+                      <div id="compare-raw" class="compare-raw__grid"></div>
+                    </section>
+                  </div>
+
+                  <footer class="compare-panel__foot">
+                    <button type="button" id="btnCopyDiff" class="ghost">复制差异内容</button>
+                    <button type="button" id="btnExportPdf" class="primary alt">导出对比报告</button>
+                  </footer>
+                </div>
+              </aside>
+            </section>
+
+            <section class="composer-panel">
+              <label class="composer-label" for="q">对话式输入区</label>
+              <div class="composer-frame">
+                <textarea
+                  id="q"
+                  rows="4"
+                  placeholder="输入问题，回车可直接发送，或点击“对比”生成结构化分析。"
+                ></textarea>
+                <div class="composer-actions">
+                  <button type="button" id="btnCompare" class="compare-pill">对比</button>
+                  <button type="button" id="btnSend" class="send-orb" aria-label="发送">
+                    <span class="send-orb__arrow" aria-hidden="true">▲</span>
+                  </button>
+                </div>
+              </div>
+            </section>
+          </section>
+
+          <section class="browser-pane panel right stack">
+            <div class="browser-stage">
+              <div id="embeds-row" class="embeds-row"></div>
+
+              <aside class="dock-rail">
+                <button type="button" id="btnDockRefresh" class="dock-btn" aria-label="刷新全部">↻</button>
+                <button type="button" id="btnAddTool" class="dock-btn dock-btn--primary" aria-label="添加 AI 工具">＋</button>
+                <div id="dock-icons" class="dock-icons"></div>
+              </aside>
+
+              <div id="tool-menu" class="tool-menu" hidden></div>
+            </div>
+
+            <footer class="browser-footer">
+              <div class="footer-brand">
+                <div class="brand-mark brand-mark--small" aria-hidden="true">
+                  <span></span>
+                </div>
+                <span>滤镜</span>
+              </div>
+              <p class="footer-copy">右侧保留真实站点操作区，左侧承载对比结果与输入流。</p>
+            </footer>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

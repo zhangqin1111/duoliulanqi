@@ -1,0 +1,56 @@
+{
+  "name": "duoliulanqi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "滤镜 —— 多源大模型内容对比与分析系统",
+  "main": "src/electron/main.js",
+  "author": "",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64",
+    "dist:dir": "electron-builder --win --x64 --dir"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.local.lvjing",
+    "productName": "滤镜",
+    "icon": "build/icon.ico",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "package.json",
+      "src/**/*"
+    ],
+    "asar": true,
+    "forceCodeSigning": false,
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "executableName": "滤镜"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "installerLanguages": ["zh_CN"],
+      "language": "2052",
+      "shortcutName": "滤镜"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-便携版.exe"
+    }
+  }
+}
