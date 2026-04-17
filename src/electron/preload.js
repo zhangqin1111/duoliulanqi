@@ -4,6 +4,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('duoliulan', {
+  getLicenseState: () => ipcRenderer.invoke('duoli:get-license-state'),
+  activateLicense: (token) => ipcRenderer.invoke('duoli:activate-license', { token }),
+  clearLicense: () => ipcRenderer.invoke('duoli:clear-license'),
+  ensureEmbedViews: () => ipcRenderer.invoke('duoli:ensure-embed-views'),
   getPlatforms: () => ipcRenderer.invoke('duoli:get-platforms'),
   getQwenConfigured: () => ipcRenderer.invoke('duoli:qwen-configured'),
   saveDashScopeKey: (key) => ipcRenderer.invoke('duoli:save-dashscope-key', { key }),

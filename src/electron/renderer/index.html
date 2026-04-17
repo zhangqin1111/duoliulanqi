@@ -7,6 +7,35 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <div id="license-gate" class="license-gate" hidden>
+      <div class="license-gate__backdrop"></div>
+      <section class="license-card" aria-labelledby="license-title">
+        <div class="license-card__eyebrow">License Required</div>
+        <h2 id="license-title" class="license-card__title">请输入应用密钥</h2>
+        <p class="license-card__desc">
+          这套工作台现在启用了授权校验。只有设置有效应用密钥后，右侧站点和对比能力才会解锁。
+        </p>
+        <div class="license-card__info">
+          <p id="license-state-text" class="settings-source">未检测到有效应用密钥。</p>
+          <p id="license-expiry-text" class="settings-msg"></p>
+        </div>
+        <label for="license-token" class="composer-label">应用密钥</label>
+        <textarea
+          id="license-token"
+          class="settings-input license-input"
+          rows="4"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="粘贴你签发的 DUOLI1 授权码"
+        ></textarea>
+        <div class="settings-actions">
+          <button type="button" id="btnActivateLicense" class="primary">激活并解锁</button>
+          <button type="button" id="btnClearLicense" class="ghost">清空当前密钥</button>
+        </div>
+        <p id="license-msg" class="settings-msg" role="status"></p>
+      </section>
+    </div>
+
     <main class="app-shell">
       <section class="workbench">
         <div class="workbench-inner">

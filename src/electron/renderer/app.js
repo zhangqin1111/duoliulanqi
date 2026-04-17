@@ -54,6 +54,13 @@ const toolMenuEl = $('#tool-menu');
 const dockIconsEl = $('#dock-icons');
 const mirrorSectionsEl = $('#mirror-sections');
 const embedsRowRootEl = $('#embeds-row');
+const licenseGateEl = $('#license-gate');
+const licenseTokenInputEl = $('#license-token');
+const licenseStateTextEl = $('#license-state-text');
+const licenseExpiryTextEl = $('#license-expiry-text');
+const licenseMsgEl = $('#license-msg');
+const btnActivateLicense = $('#btnActivateLicense');
+const btnClearLicense = $('#btnClearLicense');
 
 let api = null;
 /** @type {any[]} */
@@ -62,6 +69,7 @@ let platforms = [];
 let qwenApiOk = false;
 const guestLoaded = new Set();
 const platformVisibility = {};
+let workbenchBooted = false;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -1913,6 +1921,141 @@ function wireExportPdf() {
   });
 }
 
+function formatLicenseTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('zh-CN', { hour12: false });
+}
+
+function setLicenseLocked(locked) {
+  document.body.classList.toggle('is-license-locked', !!locked);
+  if (!licenseGateEl) return;
+  if (locked) {
+    licenseGateEl.removeAttribute('hidden');
+  } else {
+    licenseGateEl.setAttribute('hidden', '');
+  }
+}
+
+function renderLicenseState(state) {
+  const current = state || { ok: false, message: '请先输入应用密钥。' };
+  if (licenseStateTextEl) {
+    licenseStateTextEl.textContent = current.message || (current.ok ? '应用密钥有效。' : '请先输入应用密钥。');
+  }
+  if (licenseExpiryTextEl) {
+    if (current.ok) {
+      const timeText = formatLicenseTime(current.expiresAt);
+      const daysText = Number.isFinite(current.daysLeft) ? `，剩余 ${current.daysLeft} 天` : '';
+      licenseExpiryTextEl.textContent = timeText ? `到期时间：${timeText}${daysText}` : '';
+      licenseExpiryTextEl.classList.remove('err');
+    } else {
+      licenseExpiryTextEl.textContent = current.code === 'clock-rollback' ? '系统时间异常时，应用会拒绝继续使用。' : '';
+      licenseExpiryTextEl.classList.toggle('err', current.code === 'clock-rollback');
+    }
+  }
+  setLicenseLocked(!current.ok);
+}
+
+async function syncLicenseState() {
+  if (!api || typeof api.getLicenseState !== 'function') {
+    const fallback = { ok: false, code: 'unsupported', message: '当前环境不支持应用密钥校验。' };
+    renderLicenseState(fallback);
+    return fallback;
+  }
+  const state = await api.getLicenseState();
+  renderLicenseState(state);
+  return state;
+}
+
+function wireLicenseGate() {
+  if (!licenseGateEl || licenseGateEl.dataset.wired === '1') return;
+  licenseGateEl.dataset.wired = '1';
+
+  if (btnActivateLicense) {
+    btnActivateLicense.addEventListener('click', async () => {
+      if (!api || typeof api.activateLicense !== 'function' || !licenseTokenInputEl) return;
+      if (licenseMsgEl) {
+        licenseMsgEl.textContent = '';
+        licenseMsgEl.classList.remove('err');
+      }
+      btnActivateLicense.disabled = true;
+      try {
+        const state = await api.activateLicense(licenseTokenInputEl.value.trim());
+        renderLicenseState(state);
+        if (state.ok) {
+          if (licenseMsgEl) licenseMsgEl.textContent = '应用密钥已生效，正在解锁工作台。';
+          licenseTokenInputEl.value = '';
+          if (typeof api.ensureEmbedViews === 'function') {
+            await api.ensureEmbedViews();
+          }
+          await ensureWorkbenchBoot();
+        } else if (licenseMsgEl) {
+          licenseMsgEl.textContent = state.message || '应用密钥校验失败。';
+          licenseMsgEl.classList.add('err');
+        }
+      } catch (e) {
+        if (licenseMsgEl) {
+          licenseMsgEl.textContent = e && e.message ? e.message : String(e);
+          licenseMsgEl.classList.add('err');
+        }
+      } finally {
+        btnActivateLicense.disabled = false;
+      }
+    });
+  }
+
+  if (btnClearLicense) {
+    btnClearLicense.addEventListener('click', async () => {
+      if (!api || typeof api.clearLicense !== 'function') return;
+      const state = await api.clearLicense();
+      renderLicenseState(state);
+      if (licenseTokenInputEl) licenseTokenInputEl.value = '';
+      if (licenseMsgEl) {
+        licenseMsgEl.textContent = '已清除本机应用密钥。';
+        licenseMsgEl.classList.remove('err');
+      }
+    });
+  }
+}
+
+async function ensureWorkbenchBoot() {
+  if (workbenchBooted) return true;
+
+  try {
+    platforms = await api.getPlatforms();
+  } catch (e) {
+    setStatus(`读取站点配置失败：${e && e.message ? e.message : e}`);
+    return false;
+  }
+
+  if (!Array.isArray(platforms) || platforms.length === 0) {
+    setStatus('站点配置为空。');
+    return false;
+  }
+
+  renderPlatformScaffold();
+  wireUi();
+  wireSettings();
+  wireExportPdf();
+  await syncEmbedHosts();
+  try {
+    if (typeof api.getQwenConfigured === 'function') {
+      applyQwenStatus(await api.getQwenConfigured());
+    }
+  } catch (e) {
+    applyQwenStatus({ ok: false, source: 'none' });
+  }
+  if (!qwenApiOk) {
+    setSummaryStatus('未配置千问 API：请先在左侧 API 设置里保存 DashScope Key。');
+  }
+  schedulePushBounds();
+  setTimeout(schedulePushBounds, 100);
+  setTimeout(schedulePushBounds, 500);
+  workbenchBooted = true;
+  return true;
+}
+
 function collapseSettingsPanel() {
   if (settingsPanel) settingsPanel.setAttribute('hidden', '');
   if (btnSettings) btnSettings.setAttribute('aria-expanded', 'false');
@@ -2037,6 +2180,30 @@ async function boot() {
   schedulePushBounds();
   setTimeout(schedulePushBounds, 100);
   setTimeout(schedulePushBounds, 500);
+}
+
+async function boot() {
+  api = window.duoliulan;
+  if (!api || typeof api.getPlatforms !== 'function') {
+    setStatus('未检测到 Electron 桥接，请在项目目录运行 npm start。');
+    return;
+  }
+
+  wireLicenseGate();
+
+  try {
+    const licenseState = await syncLicenseState();
+    if (!licenseState.ok) {
+      setStatus('请先输入应用密钥后再使用。');
+      return;
+    }
+  } catch (e) {
+    setStatus(`应用密钥校验失败：${e && e.message ? e.message : e}`);
+    setLicenseLocked(true);
+    return;
+  }
+
+  await ensureWorkbenchBoot();
 }
 
 boot();

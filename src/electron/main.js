@@ -10,6 +10,12 @@ const {
   saveDashScopeApiKeyToFile,
   clearDashScopeApiKeyFile,
 } = require('./dashscope-qwen');
+const {
+  getLicenseState,
+  activateLicense,
+  clearLicense,
+  assertLicenseValid,
+} = require('./license');
 
 if (process.env.DUOLI_DISABLE_GPU === '1') {
   app.disableHardwareAcceleration();
@@ -21,11 +27,22 @@ if (process.platform === 'win32') {
   }
 }
 
-ipcMain.handle('duoli:get-platforms', () => platforms.map((p) => ({ ...p })));
+ipcMain.handle('duoli:get-license-state', () => getLicenseState());
+ipcMain.handle('duoli:activate-license', (_e, { token } = {}) => activateLicense(token));
+ipcMain.handle('duoli:clear-license', () => clearLicense());
 
-ipcMain.handle('duoli:qwen-configured', () => getQwenKeyStatus());
+ipcMain.handle('duoli:get-platforms', () => {
+  assertLicenseValid();
+  return platforms.map((p) => ({ ...p }));
+});
+
+ipcMain.handle('duoli:qwen-configured', () => {
+  assertLicenseValid();
+  return getQwenKeyStatus();
+});
 
 ipcMain.handle('duoli:save-dashscope-key', (_e, { key } = {}) => {
+  assertLicenseValid();
   const k = String(key || '').trim();
   const st = () => getQwenKeyStatus();
   if (k.length < 8) {
@@ -41,6 +58,7 @@ ipcMain.handle('duoli:save-dashscope-key', (_e, { key } = {}) => {
 });
 
 ipcMain.handle('duoli:clear-dashscope-key-file', () => {
+  assertLicenseValid();
   try {
     clearDashScopeApiKeyFile();
   } catch (e) {
@@ -50,6 +68,7 @@ ipcMain.handle('duoli:clear-dashscope-key-file', () => {
 });
 
 ipcMain.handle('duoli:qwen-complete', async (_e, { prompt } = {}) => {
+  assertLicenseValid();
   const p = String(prompt || '').trim();
   if (!p) {
     return { ok: false, error: 'Prompt is empty.' };
@@ -64,6 +83,7 @@ ipcMain.handle('duoli:qwen-complete', async (_e, { prompt } = {}) => {
 });
 
 ipcMain.handle('duoli:qwen-stream', async (event, { prompt, reqId } = {}) => {
+  assertLicenseValid();
   const p = String(prompt || '').trim();
   if (!p) return { ok: false, error: 'Prompt is empty.' };
   const sender = event.sender;
@@ -611,6 +631,7 @@ function buildReportHtml(payload) {
 
 ipcMain.removeHandler('duoli:export-pdf');
 ipcMain.handle('duoli:export-pdf', async (_e, payload = {}) => {
+  assertLicenseValid();
   const summaryText = String(payload && payload.summaryText ? payload.summaryText : '').trim();
   const rawReplies = Array.isArray(payload && payload.rawReplies) ? payload.rawReplies : [];
   const hasRawReply = rawReplies.some((reply) => String(reply && reply.text ? reply.text : '').trim());
@@ -1068,7 +1089,7 @@ function createWindow() {
 
   mainWindow.webContents.once('did-finish-load', () => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.maximize();
-    if (mainWindow && !mainWindow.isDestroyed()) ensureEmbedViews(mainWindow);
+    if (mainWindow && !mainWindow.isDestroyed() && getLicenseState().ok) ensureEmbedViews(mainWindow);
   });
 
   mainWindow.on('closed', () => {
@@ -1083,18 +1104,31 @@ function createWindow() {
   });
 }
 
-ipcMain.handle('duoli:get-embed-hosts', () =>
-  Object.fromEntries(
+ipcMain.handle('duoli:ensure-embed-views', () => {
+  assertLicenseValid();
+  if (mainWindow && !mainWindow.isDestroyed()) ensureEmbedViews(mainWindow);
+  return { ok: true };
+});
+
+ipcMain.handle('duoli:get-embed-hosts', () => {
+  assertLicenseValid();
+  return Object.fromEntries(
     platforms.map((cfg) => [
       cfg.id,
       embedHostsById[cfg.id] && embedHostsById[cfg.id].mode === 'detached' ? 'detached' : 'main',
     ])
-  )
-);
+  );
+});
 
-ipcMain.handle('embed:popout', async (_event, { id, bounds } = {}) => popoutEmbedView(id, bounds || {}));
+ipcMain.handle('embed:popout', async (_event, { id, bounds } = {}) => {
+  assertLicenseValid();
+  return popoutEmbedView(id, bounds || {});
+});
 
-ipcMain.handle('embed:redock', async (_event, { id } = {}) => redockEmbedView(id));
+ipcMain.handle('embed:redock', async (_event, { id } = {}) => {
+  assertLicenseValid();
+  return redockEmbedView(id);
+});
 
 ipcMain.on('embed:bounds', (event, slots) => {
   const win = BrowserWindow.fromWebContents(event.sender);
@@ -1131,6 +1165,7 @@ function isDisposedFrameError(err) {
 }
 
 ipcMain.handle('embed:exec', async (_event, { id, code }) => {
+  assertLicenseValid();
   const view = embedViewsById[id];
   if (!view) throw new Error('Embedded page is not ready yet.');
   const wc = view.webContents;
@@ -1148,6 +1183,7 @@ ipcMain.handle('embed:exec', async (_event, { id, code }) => {
 });
 
 ipcMain.handle('embed:reload', async (_event, { id } = {}) => {
+  assertLicenseValid();
   if (id) {
     const view = embedViewsById[id];
     if (view) view.webContents.reload();

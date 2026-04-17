@@ -49,6 +49,78 @@ body.has-compare-open {
   overflow: hidden;
 }
 
+body.is-license-locked {
+  overflow: hidden;
+}
+
+.license-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.license-gate[hidden] {
+  display: none !important;
+}
+
+.license-gate__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(31, 24, 18, 0.22);
+  backdrop-filter: blur(14px);
+}
+
+.license-card {
+  position: relative;
+  width: min(560px, calc(100vw - 40px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(104, 140, 255, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 245, 241, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 28px 80px rgba(66, 51, 38, 0.18);
+}
+
+.license-card__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.license-card__title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+.license-card__desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--muted-strong);
+}
+
+.license-card__info {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(49, 109, 223, 0.06);
+  border: 1px solid rgba(49, 109, 223, 0.08);
+}
+
+.license-input {
+  min-height: 110px;
+  resize: vertical;
+}
+
 button,
 input,
 textarea {
