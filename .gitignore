@@ -4,3 +4,4 @@ user-data/
 .license/
 *.log
 .DS_Store
+tmp-install/

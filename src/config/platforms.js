@@ -68,6 +68,40 @@ module.exports = [
     avatarFg: '#2d8a55',
   }),
   platform(
+    'wenxin',
+    'Wenxin',
+    'https://yiyan.baidu.com/',
+    {
+      avatar: 'W',
+      accent: '#f66a42',
+      avatarBg: '#fff0ea',
+      avatarFg: '#d45224',
+      warnText: 'Wenxin may require Baidu login before chatting in this slot.',
+    },
+    {
+      defaultMode: 'closed',
+      submitViaEnter: false,
+      useComposerSubmit: true,
+      syncInputAggressive: true,
+      minimalSubmitClicks: false,
+      preSubmitDelayMs: 900,
+      settleMs: 2800,
+      inputSelectors: [
+        'textarea[placeholder*="输入"]',
+        'textarea[placeholder*="问"]',
+        'textarea',
+        '[role="textbox"]',
+        '[contenteditable="true"]',
+      ],
+      submitButtonSelectors: [
+        'button[aria-label*="发送"]',
+        'button[aria-label*="send"]',
+        'button[type="submit"]',
+        '[role="button"][aria-label*="发送"]',
+      ],
+    }
+  ),
+  platform(
     'deepseek',
     'DeepSeek',
     'https://chat.deepseek.com/',
