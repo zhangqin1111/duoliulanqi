@@ -243,23 +243,149 @@ function renderRawReplyCards(rawReplies) {
   `;
 }
 
+function renderAnalysisSession(session) {
+  if (!session || typeof session !== 'object') return '';
+  const lines = [];
+  const diffs = Array.isArray(session.diffs) ? session.diffs : [];
+  const analyses = Array.isArray(session.diffAnalyses) ? session.diffAnalyses : [];
+  const pollution = session.pollution && typeof session.pollution === 'object' ? session.pollution : null;
+  if (diffs.length) {
+    lines.push('差异地图');
+    diffs.forEach((diff) => {
+      lines.push(`- ${diff.id || ''}｜${diff.type || ''}｜${diff.topic || ''}`);
+      if (diff.why_it_matters) lines.push(`  影响：${diff.why_it_matters}`);
+    });
+    lines.push('');
+  }
+  if (analyses.length) {
+    lines.push('追问与二次合并');
+    analyses.forEach((item) => {
+      const diff = item && item.diff ? item.diff : {};
+      const merge = item && item.merge ? item.merge : {};
+      lines.push(`- ${diff.id || ''}｜${diff.topic || ''}`);
+      if (merge.cleaned_interpretation) lines.push(`  剔除污染后的解释：${merge.cleaned_interpretation}`);
+      if (Array.isArray(merge.consensus_causes) && merge.consensus_causes.length) {
+        lines.push(`  共识原因：${merge.consensus_causes.join('；')}`);
+      }
+      if (Array.isArray(merge.remaining_disputes) && merge.remaining_disputes.length) {
+        lines.push(`  剩余分歧：${merge.remaining_disputes.join('；')}`);
+      }
+      if (Array.isArray(merge.likely_pollution) && merge.likely_pollution.length) {
+        lines.push(`  污染因素：${merge.likely_pollution.join('；')}`);
+      }
+    });
+    lines.push('');
+  }
+  if (pollution) {
+    const removed = Array.isArray(pollution.pollution_removed) ? pollution.pollution_removed : [];
+    const rootCauses = Array.isArray(pollution.root_causes) ? pollution.root_causes : [];
+    const unresolved = Array.isArray(pollution.unresolved) ? pollution.unresolved : [];
+    lines.push('污染剔除与源头归因');
+    if (removed.length) {
+      removed.forEach((item) => {
+        lines.push(`- ${item.type || '污染因素'}：${item.reason || item.content || ''}`);
+      });
+    }
+    if (rootCauses.length) lines.push(`源头归因：${rootCauses.join('；')}`);
+    if (unresolved.length) lines.push(`仍无法确定：${unresolved.join('；')}`);
+  }
+  if (!lines.length) return '';
+  return `
+    <section class="section-card section-card--full">
+      <div class="section-eyebrow">TRACEBACK LOOP</div>
+      <h2>去伪存真闭环记录</h2>
+      <pre class="summary-pre">${escapeHtml(lines.join('\n'))}</pre>
+    </section>
+  `;
+}
+
 function buildReportHtml(payload) {
   const question = String(payload && payload.question ? payload.question : '').trim();
   const summaryText = String(payload && payload.summaryText ? payload.summaryText : '').trim();
   const sections = payload && payload.sections ? payload.sections : {};
   const rawReplies = Array.isArray(payload && payload.rawReplies) ? payload.rawReplies : [];
+  const analysisSession = payload && payload.analysisSession ? payload.analysisSession : null;
 
+  const globalSummary = safeArray(sections.globalSummary);
+  const outputTrace = safeArray(sections.outputTrace);
+  const logicVisibility = safeArray(sections.logicVisibility);
+  const capabilitySpectrum = safeArray(sections.capabilitySpectrum);
+  const alignmentCauses = safeArray(sections.alignmentCauses);
+  const selectionStrategy = safeArray(sections.selectionStrategy);
+  const visualizationSpec = safeArray(sections.visualizationSpec);
   const coreConclusion = safeArray(sections.coreConclusion);
   const same = safeArray(sections.same);
   const diff = safeArray(sections.diff);
   const keyDebates = safeArray(sections.keyDebates);
   const gaps = safeArray(sections.gaps);
   const actions = safeArray(sections.actions);
-  const sectionCount = [coreConclusion, same, diff, keyDebates, gaps, actions].filter((items) => items.length).length;
+  const evaluationSections = [
+    globalSummary,
+    outputTrace,
+    logicVisibility,
+    capabilitySpectrum,
+    alignmentCauses,
+    selectionStrategy,
+    visualizationSpec,
+  ];
+  const hasEvaluationReport = evaluationSections.some((items) => items.length);
+  const sectionCount = (hasEvaluationReport ? evaluationSections : [coreConclusion, same, diff, keyDebates, gaps, actions])
+    .filter((items) => items.length).length;
   const reportTime = formatLocalTime(payload && payload.generatedAt);
 
-  const structuredSections = [
-    renderSectionCard('核心结论', coreConclusion, {
+  const structuredSections = hasEvaluationReport
+    ? [
+        renderSectionCard('全局摘要：多模型能力全景与核心矛盾', globalSummary, {
+          className: 'section-card--full',
+          eyebrow: 'EXECUTIVE PANORAMA',
+          intro: '定调模型表现、核心矛盾、深层风险、信任支点与量化看板。',
+          emptyText: '暂无全局摘要。',
+        }),
+        `
+          <div class="section-grid">
+            ${renderSectionCard('一、输出脉络与事实坐标对比', outputTrace, {
+              className: 'section-card--same',
+              eyebrow: 'FACT COORDINATES',
+              intro: '比较模型如何理解意图、组织框架、建立事实链与抵抗幻觉。',
+              emptyText: '暂无输出脉络分析。',
+            })}
+            ${renderSectionCard('二、核心逻辑链路与信息能见度分析', logicVisibility, {
+              className: 'section-card--diff',
+              eyebrow: 'LOGIC VISIBILITY',
+              intro: '识别深度推理路径、套路化生成路径与信息能见度赤字。',
+              emptyText: '暂无逻辑链路分析。',
+            })}
+          </div>
+        `,
+        `
+          <div class="section-grid">
+            ${renderSectionCard('三、能力光谱与场景割裂剖析', capabilitySpectrum, {
+              eyebrow: 'CAPABILITY SPECTRUM',
+              intro: '从场景优势、风格受众和能力割裂角度拆解模型差异。',
+              emptyText: '暂无能力光谱分析。',
+            })}
+            ${renderSectionCard('四、深层动因与价值观对齐探讨', alignmentCauses, {
+              eyebrow: 'ALIGNMENT TAX',
+              intro: '分析 RLHF 偏好、认知冻结、知识时间切片与领域茧房。',
+              emptyText: '暂无深层动因分析。',
+            })}
+          </div>
+        `,
+        renderSectionCard('五、选型研判与调用策略推演', selectionStrategy, {
+          className: 'section-card--full',
+          eyebrow: 'ROUTING STRATEGY',
+          intro: '把评测结果转化为风险矩阵、提示词调优、模型路由与混合编排方案。',
+          emptyText: '暂无选型策略。',
+        }),
+        renderSectionCard('数据可视化组件规格', visualizationSpec, {
+          className: 'section-card--full',
+          eyebrow: 'VISUAL SPEC',
+          intro: '为前端直接落地雷达图、桑基图、漏斗图、树状图、气泡图和矩阵图提供字段建议。',
+          emptyText: '暂无图表规格。',
+        }),
+      ].join('')
+    : [
+        renderSectionCard('核心结论', coreConclusion, {
       className: 'section-card--full',
       eyebrow: 'EXECUTIVE TAKE',
       intro: '保留最值得带走的判断，方便快速复盘或对外同步。',
@@ -301,7 +427,7 @@ function buildReportHtml(payload) {
       intro: '下一步该怎么追问、核查、采用、规避或补证。',
       emptyText: '暂未生成行动建议。',
     }),
-  ].join('');
+      ].join('');
 
   return `<!DOCTYPE html>
   <html lang="zh-CN">
@@ -622,6 +748,7 @@ function buildReportHtml(payload) {
       <section class="report-body">
         ${structuredSections}
         ${sectionCount ? '' : renderSummaryFallback(summaryText)}
+        ${renderAnalysisSession(analysisSession)}
         ${renderRawReplyCards(rawReplies)}
       </section>
     </main>
@@ -737,7 +864,7 @@ function safeRemoveBrowserView(win, view) {
 function hideBrowserView(view) {
   if (!view) return;
   try {
-    view.setBounds({ x: -10000, y: -10000, width: 1, height: 1 });
+    view.setBounds({ x: -20000, y: -20000, width: 1280, height: 900 });
   } catch (e) {
     /* ignore */
   }
