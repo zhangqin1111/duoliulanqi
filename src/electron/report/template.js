@@ -378,21 +378,55 @@ function renderAnalysisSession(session) {
   }
   const diffAnalyses = Array.isArray(session.diffAnalyses) ? session.diffAnalyses : [];
   if (diffAnalyses.length) {
-    lines.push('差异追问与合并');
+    lines.push('');
+    lines.push('差异追问与合并(收敛驱动,最多 4 轮)');
     diffAnalyses.forEach((item) => {
+      const id = (item && item.diff && item.diff.id) || '';
       const summary = item && item.merge && item.merge.cleaned_interpretation ? item.merge.cleaned_interpretation : (item && item.diff && item.diff.topic) || '';
-      lines.push(`- ${(item && item.diff && item.diff.id) || ''}：${summary}`);
+      const rounds = item && item.rounds ? `(${item.rounds} 轮${item.stopReason ? '·' + item.stopReason : ''})` : '';
+      lines.push(`- ${id}${rounds}：${summary}`);
     });
   }
   const pollution = session && session.pollution ? session.pollution : null;
   if (pollution) {
     const removed = Array.isArray(pollution.pollution_removed) ? pollution.pollution_removed : [];
     if (removed.length) {
-      lines.push('污染剔除');
+      lines.push('');
+      lines.push('污染剔除(千问初判)');
       removed.slice(0, 8).forEach((item) => {
-        lines.push(`- ${item.type || '污染因素'}：${item.reason || item.content || ''}`);
+        lines.push(`- ${item.type || '污染因素'}｜${item.source || '未指定'}：${item.reason || item.content || ''}`);
       });
     }
+  }
+  const sc = session && session.selfCleansing ? session.selfCleansing : null;
+  const merged = sc && sc.merged ? sc.merged : null;
+  if (merged) {
+    lines.push('');
+    lines.push('AI 自我剔除污染(三家自审 + 千问归档)');
+    if (merged.self_cleansed_summary) {
+      lines.push(`总览:${merged.self_cleansed_summary}`);
+    }
+    const consensus = Array.isArray(merged.consensus_pollution) ? merged.consensus_pollution : [];
+    if (consensus.length) {
+      lines.push('共识撤回(三家都接受):');
+      consensus.slice(0, 6).forEach((item) => lines.push(`  · ${item}`));
+    }
+    const contested = Array.isArray(merged.contested_pollution) ? merged.contested_pollution : [];
+    if (contested.length) {
+      lines.push('仍存分歧(有 AI 拒绝撤回):');
+      contested.slice(0, 6).forEach((item) => lines.push(`  · ${item}`));
+    }
+    const perModel = Array.isArray(merged.per_model) ? merged.per_model : [];
+    perModel.forEach((row) => {
+      const accepted = Array.isArray(row.accepted) ? row.accepted.length : 0;
+      const partial = Array.isArray(row.partial) ? row.partial.length : 0;
+      const rejected = Array.isArray(row.rejected) ? row.rejected.length : 0;
+      lines.push(`- ${row.model || '未知模型'}：接受 ${accepted}｜部分接受 ${partial}｜拒绝 ${rejected}`);
+      if (row.cleaned_conclusion) lines.push(`  净化结论:${row.cleaned_conclusion}`);
+    });
+  } else if (sc && sc.error) {
+    lines.push('');
+    lines.push(`AI 自审阶段失败:${sc.error}`);
   }
   if (!lines.length) return '';
   return `

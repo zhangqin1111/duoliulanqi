@@ -268,7 +268,7 @@
     ].join('\n');
   }
 
-  function buildFinalTracePrompt(question, modelReplies, diffAnalyses, pollution, originalQuestion) {
+  function buildFinalTracePrompt(question, modelReplies, diffAnalyses, pollution, originalQuestion, selfCleansing) {
     const api = global.DuoliEvaluationReportPrompt;
     if (api && typeof api.buildEvaluationReportPrompt === 'function') {
       return api.buildEvaluationReportPrompt({
@@ -277,6 +277,7 @@
         modelReplies,
         diffAnalyses,
         pollution,
+        selfCleansing,
       });
     }
     return [
@@ -529,7 +530,7 @@
         renderAnalysisProgress(session, `完成 ${diff.id} 的追问闭环`);
       }
 
-      renderAnalysisProgress(session, '正在剔除污染因素');
+      renderAnalysisProgress(session, '正在剔除污染因素(千问初判)');
       session.pollution = await qwenJson(api, buildPollutionPrompt(question, modelReplies, session.diffAnalyses), {
         pollution_removed: [],
         kept_claims: [],
@@ -539,11 +540,26 @@
       });
       setSession(session);
 
+      renderAnalysisProgress(session, '让三家 AI 自审并剔除自身污染');
+      try {
+        session.selfCleansing = await runSelfCleansingRound(session, modelReplies, session.pollution);
+      } catch (e) {
+        session.selfCleansing = { audits: [], merged: null, error: (e && e.message) || String(e) };
+      }
+      setSession(session);
+
       renderAnalysisProgress(session, '正在生成追根溯源结论');
       let accumulated = '';
       const summaryBodyEl = getSummaryBodyEl();
       const r = await api.qwenStream(
-        buildFinalTracePrompt(question, modelReplies, session.diffAnalyses, session.pollution, session.originalQuestion),
+        buildFinalTracePrompt(
+          question,
+          modelReplies,
+          session.diffAnalyses,
+          session.pollution,
+          session.originalQuestion,
+          session.selfCleansing
+        ),
         (delta) => {
           accumulated += delta;
           if (summaryBodyEl) {

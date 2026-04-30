@@ -33,6 +33,7 @@
     const modelNames = modelReplies.map((reply) => reply.name).join(' / ');
     const diffAnalyses = data.diffAnalyses ? JSON.stringify(data.diffAnalyses, null, 2) : '[]';
     const pollution = data.pollution ? JSON.stringify(data.pollution, null, 2) : '{}';
+    const selfCleansing = data.selfCleansing ? JSON.stringify(data.selfCleansing, null, 2) : 'null';
 
     const lines = [
       '# 角色与任务',
@@ -101,8 +102,13 @@
       '# 差异追问与二次合并结果',
       diffAnalyses,
       '',
-      '# 污染剔除结果',
-      pollution
+      '# 污染剔除结果(千问初判)',
+      pollution,
+      '',
+      '# AI 自我剔除污染结果(三家自审 + 千问归档)',
+      '说明:三家 AI 已基于上面千问初判的污染清单做了自我裁定。下面是合并结果,其中 consensus_pollution 为三家都接受撤回的污染、contested_pollution 为仍有 AI 拒绝撤回的污染。',
+      '在【全局摘要】【一】【四】各章中,凡涉及污染分析,优先采信 consensus_pollution;contested_pollution 必须显式标注"仍存在分歧"。',
+      selfCleansing
     );
     return lines.join('\n');
   }

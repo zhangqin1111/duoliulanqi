@@ -16,7 +16,9 @@
       "Bash(node -e ' *)",
       "Bash(node scripts/smoke-report.js)",
       "PowerShell(Get-Process *)",
-      "Bash(node -c D:/aicode/duoliulanqi/src/electron/renderer/reporting.js)"
+      "Bash(node -c D:/aicode/duoliulanqi/src/electron/renderer/reporting.js)",
+      "Bash(node -c D:/aicode/duoliulanqi/src/electron/renderer/truth-seeking.js)",
+      "Bash(node -c D:/aicode/duoliulanqi/src/electron/renderer/evaluation-report-prompt.js)"
     ]
   }
 }
