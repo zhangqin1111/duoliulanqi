@@ -310,13 +310,27 @@
       });
     }
 
+    async function resolveRefinedQuestion(raw) {
+      if (typeof deps.refineQuestion !== 'function' || !deps.isQwenApiOk()) {
+        return { refined: raw, original: raw, fellBack: true, reason: 'refiner unavailable' };
+      }
+      deps.setStatus('正在用千问补全问题…');
+      try {
+        const result = await deps.refineQuestion(raw);
+        if (result && result.refined) return result;
+      } catch (e) {
+        /* ignore — fall back below */
+      }
+      return { refined: raw, original: raw, fellBack: true, reason: 'refine error' };
+    }
+
     function wireSendButton() {
       const btnSend = deps.getSendButton();
       const qEl = deps.getQuestionInput();
       if (!btnSend || !qEl) return;
       btnSend.addEventListener('click', async () => {
-        const q = qEl.value.trim();
-        if (!q) {
+        const raw = qEl.value.trim();
+        if (!raw) {
           deps.setStatus('请先输入问题。');
           qEl.focus();
           return;
@@ -326,7 +340,9 @@
           return;
         }
         deps.setBusy(true);
-        deps.syncQuestionChip(q);
+        deps.syncQuestionChip(raw);
+        qEl.value = '';
+        if (typeof deps.resizeComposerInput === 'function') deps.resizeComposerInput();
         deps.setStatus('多模型并发执行中…');
         const summaryBodyEl = deps.getSummaryBodyEl();
         if (summaryBodyEl && !deps.getAutoSummarizeAfterSend()) {
@@ -335,10 +351,18 @@
         }
         deps.setSummaryStatus('');
         try {
-          const results = await deps.runConcurrentAsk(q);
+          const { refined, fellBack } = await resolveRefinedQuestion(raw);
+          const dispatch = refined || raw;
+          deps.syncQuestionChip(dispatch);
+          if (!fellBack && dispatch !== raw) {
+            deps.setStatus('已用千问补全问题，多模型并发执行中…');
+          } else {
+            deps.setStatus('多模型并发执行中…');
+          }
+          const results = await deps.runConcurrentAsk(dispatch);
           if (deps.getAutoSummarizeAfterSend() && deps.isQwenApiOk()) {
             deps.setSummaryStatus('三站已有结果，正在自动生成结构化对比…');
-            await deps.runCompareAndSummarize(q, { results });
+            await deps.runCompareAndSummarize(dispatch, { results, originalQuestion: raw });
             deps.setStatus('发送完成，并已生成结构化对比。');
           } else {
             deps.setStatus('多模型发送完成，可继续点击“对比”生成结构化分析。');
@@ -356,8 +380,8 @@
       const qEl = deps.getQuestionInput();
       if (!btnCompare || !qEl) return;
       btnCompare.addEventListener('click', async () => {
-        const q = qEl.value.trim();
-        if (!q) {
+        const raw = qEl.value.trim();
+        if (!raw) {
           deps.setStatus('请先输入问题。');
           qEl.focus();
           return;
@@ -371,10 +395,20 @@
           return;
         }
         deps.setBusy(true);
-        deps.syncQuestionChip(q);
+        deps.syncQuestionChip(raw);
+        qEl.value = '';
+        if (typeof deps.resizeComposerInput === 'function') deps.resizeComposerInput();
         deps.setStatus('对比流程：多模型并发 -> 结构化总结');
         try {
-          await deps.runCompareAndSummarize(q);
+          const { refined, fellBack } = await resolveRefinedQuestion(raw);
+          const dispatch = refined || raw;
+          deps.syncQuestionChip(dispatch);
+          if (!fellBack && dispatch !== raw) {
+            deps.setStatus('已用千问补全问题，开始多模型并发对比…');
+          } else {
+            deps.setStatus('对比流程：多模型并发 -> 结构化总结');
+          }
+          await deps.runCompareAndSummarize(dispatch, { originalQuestion: raw });
           deps.openComparePanel();
           deps.setStatus('对比流程已完成。');
         } catch (e) {

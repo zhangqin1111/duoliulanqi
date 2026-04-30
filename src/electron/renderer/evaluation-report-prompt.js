@@ -27,12 +27,14 @@
   function buildEvaluationReportPrompt(input) {
     const data = input || {};
     const question = String(data.question || data.userQuestion || '').trim();
+    const originalQuestion = String(data.originalQuestion || '').trim();
+    const wasRefined = !!originalQuestion && originalQuestion !== question;
     const modelReplies = normalizeReplies(data.modelReplies || data.results || []);
     const modelNames = modelReplies.map((reply) => reply.name).join(' / ');
     const diffAnalyses = data.diffAnalyses ? JSON.stringify(data.diffAnalyses, null, 2) : '[]';
     const pollution = data.pollution ? JSON.stringify(data.pollution, null, 2) : '{}';
 
-    return [
+    const lines = [
       '# 角色与任务',
       '你是一位顶尖的 AI 算法评测专家与数据可视化分析师。',
       '你的任务是根据【用户提问】与【多个大语言模型输出结果】，生成一份深度对比分析报告。',
@@ -45,6 +47,13 @@
       '4. 必须显式区分：事实错误、逻辑跳跃、表达差异、对齐噪音、信息能见度赤字、结构化失配。',
       '5. 量化指标必须给出 0-100 分或百分比；若依据不足，用“估算”标记，不可装作精确测量。',
       '6. 语言极度精炼、专业，优先使用“结构化失配”“认知冻结”“信息能见度赤字”“对齐税”“知识茧房”等分析术语。',
+    ];
+    if (wasRefined) {
+      lines.push(
+        '7. 用户原始提问与系统补全后的下发问题不一致：评测对象是模型对【实际下发问题】的回答；若发现补全引入的措辞影响了对比结论，需在【全局摘要 → 深层风险】中显式指出。'
+      );
+    }
+    lines.push(
       '',
       '# 输出格式',
       '必须严格使用以下一级标题，标题单独占一行；标题下用二级小标题和项目符号展开。',
@@ -59,11 +68,32 @@
       '五、必须包含 5.1 风险评估矩阵、5.2 场景化选型指南；必须给出四象限选型矩阵和混合工作流架构图建议。',
       '数据可视化组件规格：用列表列出每个图表的组件名、图表类型、字段、推荐编码方式、交互能力。',
       '',
-      '# 参与模型',
-      modelNames || '未识别模型名称',
+      '# 结构化数据(必填,放在所有章节之后)',
+      '在【数据可视化组件规格】之后,你必须再追加一个独立的代码块,起止严格用三反引号 + 小写 json 标注,内容为单个 JSON 对象,字段如下:',
+      '- scoreboard: 数组,每个模型一项,结构 {"model": 模型名, "scores": {"有效信息率":int 0-100, "逻辑自洽度":int 0-100, "事实保真度":int 0-100, "对齐噪音率":int 0-100, "综合可用性":int 0-100}}。所有上方"参与模型"必须出现。',
+      '- core_tension: {"axis_x": 一句话维度名, "axis_y": 一句话维度名, "summary": 不超过 60 字的核心矛盾陈述}。',
+      '- selection_quadrant: 数组,每个模型一项,结构 {"model": 模型名, "cost": 0-100 估值(越大越贵/越慢), "quality": 0-100 估值, "scenario": 8-20 字最适合的场景}。',
+      '- info_funnel: 数组,每个模型一项,结构 {"model": 模型名, "total_tokens": int 估算的总输出量, "core_tokens": int 估算的核心论点量, "alignment_noise_tokens": int 估算的对齐噪音量}。三者满足 core+alignment ≤ total。',
+      '- alignment_tax: 数组,每个模型一项,结构 {"model": 模型名, "components": {"reasoning":int, "facts":int, "safety_padding":int, "hedging":int, "boilerplate":int}}。所有 components 数值范围 0-100,代表占总输出的百分比,五项之和不强制等于 100,但请尽量自洽。',
+      '- fact_sankey: {"nodes": [{"id": 短 id, "label": 显示名, "tier": 0/1/2}], "links": [{"source": id, "target": id, "value": int 0-100, "kind": "support" | "weak" | "hallucination"}]}。tier 0=核心论点,tier 1=证据/事实链,tier 2=源头或断裂点(尤其要标记疑似幻觉)。节点和连线可少不可滥造。',
+      '硬性 JSON 规则:严格 ASCII 双引号、不带尾逗号、不带注释、所有数值用整数;若某字段确实没有依据,可用空数组或保守估算并在 summary 字段里说明,但 JSON 结构必须完整可解析。',
       '',
-      '# 用户提问',
-      question,
+      '# 参与模型',
+      modelNames || '未识别模型名称'
+    );
+    if (wasRefined) {
+      lines.push(
+        '',
+        '# 用户原始提问（未经补全）',
+        originalQuestion,
+        '',
+        '# 实际下发问题（已由系统自动补全）',
+        question
+      );
+    } else {
+      lines.push('', '# 用户提问', question);
+    }
+    lines.push(
       '',
       '# 模型原始输出',
       formatReplies(modelReplies),
@@ -72,8 +102,9 @@
       diffAnalyses,
       '',
       '# 污染剔除结果',
-      pollution,
-    ].join('\n');
+      pollution
+    );
+    return lines.join('\n');
   }
 
   global.DuoliEvaluationReportPrompt = {

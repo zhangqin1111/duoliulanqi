@@ -163,6 +163,18 @@
       });
     }
 
+    function questionRefiner() {
+      return controller('questionRefiner', {
+        moduleName: 'DuoliQuestionRefiner',
+        factoryName: 'createQuestionRefiner',
+        label: 'Question refiner',
+        createDeps: () => ({
+          getApi: ctx.getApi,
+          timeoutMs: 8000,
+        }),
+      });
+    }
+
     function aiConversation() {
       return controller('aiConversation', {
         moduleName: 'DuoliAiConversation',
@@ -327,6 +339,7 @@
       reportExporter,
       reportSession,
       statusPresenter,
+      questionRefiner,
       truthSeekingRunner,
       uiWiring,
       userPreferences,

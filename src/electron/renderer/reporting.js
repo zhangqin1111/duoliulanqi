@@ -36,8 +36,23 @@
     return normalizeHeading(line) === normalizeHeading(heading);
   }
 
+  function stripStructuredBlocks(text) {
+    let out = String(text || '')
+      .replace(/```json[\s\S]*?```/gi, '')
+      .replace(/```[\s\S]*?```/gi, '');
+    const cutMarkers = ['差异追问记录', '污染剔除摘要'];
+    for (const marker of cutMarkers) {
+      const idx = out.indexOf(`\n${marker}`);
+      if (idx >= 0) {
+        out = out.slice(0, idx);
+        break;
+      }
+    }
+    return out.trim();
+  }
+
   function parseReportSections(summaryText) {
-    const text = String(summaryText || '').trim();
+    const text = stripStructuredBlocks(summaryText);
     const sections = Object.fromEntries(REPORT_HEADINGS.map((heading) => [heading, '']));
     if (!text) return sections;
 

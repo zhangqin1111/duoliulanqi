@@ -133,6 +133,7 @@ function getAppComposition() {
         popoutPlatform,
         positionToolMenu,
         redockPlatform,
+        refineQuestion,
         refreshComparePanel,
         renderPlatformScaffold,
         renderPlatformVisibility,
@@ -375,6 +376,14 @@ function getAutoSummarizeAfterSend() {
 
 function getAiConversationController() {
   return getAppComposition().aiConversation();
+}
+
+function getQuestionRefiner() {
+  return getAppComposition().questionRefiner();
+}
+
+async function refineQuestion(rawQuestion) {
+  return getQuestionRefiner().refineQuestion(rawQuestion);
 }
 
 async function runConcurrentAsk(question) {

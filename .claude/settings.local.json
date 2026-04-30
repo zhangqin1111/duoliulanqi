@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -c src/electron/renderer/question-refiner.js)",
+      "Bash(node -c src/electron/renderer/ui-wiring.js)",
+      "Bash(node -c src/electron/renderer/truth-seeking.js)",
+      "Bash(node -c src/electron/renderer/evaluation-report-prompt.js)",
+      "Bash(node -c src/electron/renderer/app-composition.js)",
+      "Bash(npm start *)",
+      "Bash(node -c D:/aicode/duoliulanqi/src/electron/report/chart-svg.js)",
+      "Bash(node -c D:/aicode/duoliulanqi/src/electron/report/wordcloud.js)",
+      "Bash(node -e \"const w = require\\('./src/electron/report/wordcloud'\\); const text = '这是一段中文测试文本。模型的逻辑推理能力非常强,但事实保真度需要进一步评估。逻辑推理能力是核心。事实保真度也是评测重点。'; console.log\\('tokens:', w.tokenize\\(text\\).slice\\(0, 20\\)\\); console.log\\('top:', w.topWords\\(text, 8\\)\\);\")",
+      "Bash(node -c D:/aicode/duoliulanqi/src/electron/report/template.js)",
+      "Bash(node scripts/replace-export-pdf-block.js)",
+      "Bash(node -c src/electron/main.js)",
+      "Bash(node -e ' *)",
+      "Bash(node scripts/smoke-report.js)",
+      "PowerShell(Get-Process *)",
+      "Bash(node -c D:/aicode/duoliulanqi/src/electron/renderer/reporting.js)"
+    ]
+  }
+}

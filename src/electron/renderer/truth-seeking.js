@@ -199,11 +199,12 @@
     ].join('\n');
   }
 
-  function buildFinalTracePrompt(question, modelReplies, diffAnalyses, pollution) {
+  function buildFinalTracePrompt(question, modelReplies, diffAnalyses, pollution, originalQuestion) {
     const api = global.DuoliEvaluationReportPrompt;
     if (api && typeof api.buildEvaluationReportPrompt === 'function') {
       return api.buildEvaluationReportPrompt({
         question,
+        originalQuestion,
         modelReplies,
         diffAnalyses,
         pollution,
@@ -211,13 +212,14 @@
     }
     return [
       '请基于完整去伪存真流程，生成多模型深度评测报告。',
-      `用户提问：${question}`,
+      originalQuestion && originalQuestion !== question ? `用户原始提问：${originalQuestion}` : '',
+      `实际下发问题：${question}`,
       ...modelReplies.map((reply) => `【${reply.name}】\n${reply.ok ? reply.text : `未获得有效回答：${reply.error || 'unknown'}`}\n`),
       '差异追问与二次合并：',
       JSON.stringify(diffAnalyses, null, 2),
       '污染剔除结果：',
       JSON.stringify(pollution, null, 2),
-    ].join('\n');
+    ].filter(Boolean).join('\n');
   }
 
   function renderFinalAnalysisText(finalText, session) {
@@ -265,14 +267,15 @@
     function renderAnalysisProgress(session, message) {
       const summaryBodyEl = getSummaryBodyEl();
       if (!summaryBodyEl) return;
-      const lines = [
-        '去伪存真分析中',
-        '',
-        `原始问题：${session.question}`,
-        '',
-        `当前阶段：${message}`,
-        '',
-      ];
+      const wasRefined = session.originalQuestion && session.originalQuestion !== session.question;
+      const lines = ['去伪存真分析中', ''];
+      if (wasRefined) {
+        lines.push(`用户原始提问：${session.originalQuestion}`);
+        lines.push(`实际下发问题（千问已补全）：${session.question}`);
+      } else {
+        lines.push(`原始问题：${session.question}`);
+      }
+      lines.push('', `当前阶段：${message}`, '');
       if (session.diffs && session.diffs.length) {
         lines.push('已识别差异');
         session.diffs.forEach((diff) => {
@@ -359,9 +362,11 @@
       const resultsPreloaded = opt && Array.isArray(opt.results);
       const initialResults = resultsPreloaded ? opt.results : await deps.runConcurrentAsk(question);
       const modelReplies = normalizeModelResults(initialResults);
+      const originalQuestion = String((opt && opt.originalQuestion) || question || '').trim();
       const session = {
         id: `analysis_${Date.now()}`,
         question,
+        originalQuestion,
         createdAt: new Date().toISOString(),
         initialResults: modelReplies,
         diffs: [],
@@ -409,7 +414,7 @@
       let accumulated = '';
       const summaryBodyEl = getSummaryBodyEl();
       const r = await api.qwenStream(
-        buildFinalTracePrompt(question, modelReplies, session.diffAnalyses, session.pollution),
+        buildFinalTracePrompt(question, modelReplies, session.diffAnalyses, session.pollution, session.originalQuestion),
         (delta) => {
           accumulated += delta;
           if (summaryBodyEl) {
