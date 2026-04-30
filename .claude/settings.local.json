@@ -20,7 +20,11 @@
       "Bash(node -c D:/aicode/duoliulanqi/src/electron/renderer/truth-seeking.js)",
       "Bash(node -c D:/aicode/duoliulanqi/src/electron/renderer/evaluation-report-prompt.js)",
       "Bash(npm install *)",
-      "Bash(node -e \"console.log\\(require\\('docx'\\).Document ? 'docx OK' : 'no Document export'\\)\")"
+      "Bash(node -e \"console.log\\(require\\('docx'\\).Document ? 'docx OK' : 'no Document export'\\)\")",
+      "Bash(node scripts/generate-investor-deck.js)",
+      "Bash(node -e \"const r = require\\('@resvg/resvg-js'\\); const p = require\\('pptxgenjs'\\); console.log\\('resvg', !!r.Resvg, 'pptxgenjs', typeof p\\);\")",
+      "Bash(node scripts/render-chart-pngs.js)",
+      "Bash(node scripts/generate-investor-ppt.js)"
     ]
   }
 }
