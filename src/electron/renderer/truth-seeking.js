@@ -173,6 +173,75 @@
     return lines.join('\n');
   }
 
+  function pollutionItemsForModel(pollution, modelName) {
+    const removed = pollution && Array.isArray(pollution.pollution_removed) ? pollution.pollution_removed : [];
+    const exact = removed.filter((item) => String(item.source || '').includes(modelName));
+    if (exact.length) return exact;
+    return removed.filter((item) => !item.source || item.source === '阶段' || item.source === '所有模型' || item.source === '全部');
+  }
+
+  function buildSelfAuditPrompt(question, modelName, originalReply, attributedPollution) {
+    const lines = [
+      '这是去伪存真流程的"自我剔除污染"阶段。',
+      `你是 ${modelName}。下面给出原始问题、你之前的回答,以及评测系统对你这次回答标注的疑似污染项。`,
+      '',
+      '请你逐条做出表态,不要重新回答原始问题,不要展开新论述,只针对下列每个污染项给出"接受/部分接受/拒绝"判断,并简要说明理由。最后给出"剔除污染后的净化版核心结论"。',
+      '',
+      '污染类型说明:模板话术、安全规避、幻觉补全(无证据补全细节)、过度推测、上下文污染、时效污染、口径漂移、表达风格噪音。',
+      '',
+      `# 原始问题`,
+      String(question || '').trim() || '(空)',
+      '',
+      `# 你之前的回答`,
+      String(originalReply || '').trim() || '(空)',
+      '',
+      `# 系统标注的疑似污染项`,
+    ];
+    const items = Array.isArray(attributedPollution) ? attributedPollution : [];
+    if (!items.length) {
+      lines.push('(系统未对你单独标注;请扫描自己上文,主动列出可能存在的污染并撤回。)');
+    } else {
+      items.forEach((item, idx) => {
+        lines.push(`${idx + 1}. 类型:${item.type || '未分类'};内容:${item.content || ''};理由:${item.reason || ''}`);
+      });
+    }
+    lines.push(
+      '',
+      '# 输出格式(请用纯文本,分两段)',
+      '【污染逐项裁定】',
+      '- 第 N 项:接受/部分接受/拒绝 —— 理由(一句话);若接受请明确撤回的措辞,若拒绝请说明你的证据或推理。',
+      '...',
+      '【净化后核心结论】',
+      '不超过 200 字,只保留你坚持成立、且能给出依据的判断。',
+    );
+    return lines.join('\n');
+  }
+
+  function buildSelfCleansingMergePrompt(question, selfAudits) {
+    return [
+      '你是去伪存真流程的"自审合并器"。任务:把多个 AI 对系统标注污染的自我裁定合并成结构化数据,不要重新回答原始问题。',
+      '',
+      '请严格输出 JSON,不要 Markdown:',
+      '{',
+      '  "per_model": [',
+      '    {"model":"模型名","accepted":["该模型接受撤回的污染描述"],"partial":["部分接受需要修订的"],"rejected":["明确拒绝并坚持的说法"],"cleaned_conclusion":"该模型净化后的核心结论"}',
+      '  ],',
+      '  "consensus_pollution": ["三家自审中被全部接受撤回的污染项"],',
+      '  "contested_pollution": ["仍有 AI 拒绝撤回的污染项"],',
+      '  "self_cleansed_summary": "一句话总结自审环节的整体收敛情况"',
+      '}',
+      '',
+      `原始问题:${String(question || '').trim() || '(空)'}`,
+      '',
+      '各模型的自我裁定:',
+      ...selfAudits.map((audit) => [
+        `【${audit.modelName}】`,
+        audit.ok ? audit.text : `未获得有效自审回答:${audit.error || 'unknown'}`,
+        '',
+      ].join('\n')),
+    ].join('\n');
+  }
+
   function buildPollutionPrompt(question, modelReplies, diffAnalyses) {
     return [
       '你是“去伪存真”流程里的污染剔除器。',
@@ -328,16 +397,68 @@
       return { round, question: prompt, replies };
     }
 
+    const MAX_FOLLOWUP_ROUNDS = 4;
+
+    async function runSelfCleansingRound(session, modelReplies, pollution) {
+      const api = getApi();
+      const chats = deps.chatPlatforms();
+      if (!chats.length || !pollution) return null;
+      await Promise.all(chats.map((cfg) => deps.waitUntilGuestLoaded(cfg.id, 90000)));
+      chats.forEach((cfg) => deps.setColStatus(cfg.id, '正在自审污染', 'pending'));
+
+      const audits = await Promise.all(
+        chats.map(async (cfg) => {
+          const reply = modelReplies.find((r) => r.id === cfg.id || r.name === cfg.name);
+          const originalText = reply && reply.ok ? reply.text : '';
+          const attributed = pollutionItemsForModel(pollution, cfg.name);
+          const prompt = buildSelfAuditPrompt(session.question, cfg.name, originalText, attributed);
+          const r = await deps.askOnePlatform(cfg, prompt, {
+            replyStableIdleMs: Math.min(deps.getReplyStableIdleMs(), 8000),
+            responseTimeoutMs: 60000,
+            retries: 0,
+            minStableChars: 10,
+            minQuietAfterFirstReplyMs: 5000,
+          });
+          deps.setColStatus(cfg.id, r.ok ? '自审完成' : `自审失败:${r.error || ''}`, r.ok ? 'ok' : 'err');
+          return {
+            id: cfg.id,
+            modelName: cfg.name,
+            ok: !!r.ok,
+            text: r.ok ? String(r.text || '').trim() : '',
+            error: r.ok ? '' : String(r.error || ''),
+            attributedPollution: attributed,
+          };
+        })
+      );
+
+      const merged = await qwenJson(api, buildSelfCleansingMergePrompt(session.question, audits), {
+        per_model: audits.map((a) => ({
+          model: a.modelName,
+          accepted: [],
+          partial: [],
+          rejected: [],
+          cleaned_conclusion: '',
+        })),
+        consensus_pollution: [],
+        contested_pollution: [],
+        self_cleansed_summary: '',
+      });
+
+      return { audits, merged };
+    }
+
     async function resolveDiffClosedLoop(session, diff) {
       const api = getApi();
       const followupRounds = [];
       let currentPrompt = buildDiffFollowupQuestion(session.question, diff, 1);
       let merge = null;
-      for (let round = 1; round <= 2; round++) {
-        renderAnalysisProgress(session, `正在追问 ${diff.id}：${diff.topic}`);
+      let round = 1;
+      let stopReason = '';
+      while (round <= MAX_FOLLOWUP_ROUNDS) {
+        renderAnalysisProgress(session, `正在第 ${round} 轮追问 ${diff.id}：${diff.topic}`);
         const followup = await askAllModelsForDiff(session, diff, currentPrompt, round);
         followupRounds.push(followup);
-        renderAnalysisProgress(session, `正在合并 ${diff.id} 的追问结果`);
+        renderAnalysisProgress(session, `正在合并 ${diff.id} 第 ${round} 轮追问结果`);
         merge = await qwenJson(api, buildSecondMergePrompt(session.question, diff, followupRounds), {
           diff_id: diff.id,
           consensus_causes: [],
@@ -349,12 +470,19 @@
           followup_question: '',
         });
         const action = String(merge.next_action || 'stop');
-        if (action !== 'ask_again' || round === 2) break;
-        currentPrompt =
-          String(merge.followup_question || '').trim() ||
-          buildDiffFollowupQuestion(session.question, diff, round + 1);
+        if (action !== 'ask_again') {
+          stopReason = `merge=${action}`;
+          break;
+        }
+        if (round >= MAX_FOLLOWUP_ROUNDS) {
+          stopReason = `cap=${MAX_FOLLOWUP_ROUNDS}`;
+          break;
+        }
+        const nextPrompt = String(merge.followup_question || '').trim();
+        currentPrompt = nextPrompt || buildDiffFollowupQuestion(session.question, diff, round + 1);
+        round += 1;
       }
-      return { diff, followupRounds, merge };
+      return { diff, followupRounds, merge, rounds: round, stopReason };
     }
 
     async function run(question, opt) {
@@ -372,6 +500,7 @@
         diffs: [],
         diffAnalyses: [],
         pollution: null,
+        selfCleansing: null,
         finalText: '',
       };
       setSession(session);
