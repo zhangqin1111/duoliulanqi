@@ -14,6 +14,7 @@
     "license:batch": "node scripts/license-batch.js"
   },
   "devDependencies": {
+    "docx": "^9.6.1",
     "electron": "^28.3.3",
     "electron-builder": "^25.1.8"
   },
@@ -35,11 +36,15 @@
       "target": [
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "executableName": "lvjing"
@@ -48,7 +53,9 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
-      "installerLanguages": ["zh_CN"],
+      "installerLanguages": [
+        "zh_CN"
+      ],
       "language": "2052",
       "shortcutName": "滤镜"
     },

@@ -18,7 +18,9 @@
       "PowerShell(Get-Process *)",
       "Bash(node -c D:/aicode/duoliulanqi/src/electron/renderer/reporting.js)",
       "Bash(node -c D:/aicode/duoliulanqi/src/electron/renderer/truth-seeking.js)",
-      "Bash(node -c D:/aicode/duoliulanqi/src/electron/renderer/evaluation-report-prompt.js)"
+      "Bash(node -c D:/aicode/duoliulanqi/src/electron/renderer/evaluation-report-prompt.js)",
+      "Bash(npm install *)",
+      "Bash(node -e \"console.log\\(require\\('docx'\\).Document ? 'docx OK' : 'no Document export'\\)\")"
     ]
   }
 }
