@@ -102,7 +102,14 @@
               <div class="question-chip" id="question-chip">等待输入问题</div>
 
               <div class="thread-scroll" id="thread-scroll">
-                <article class="result-document">
+                <section id="chat-empty" class="chat-empty" aria-label="欢迎提示">
+                  <div class="chat-empty__orb" aria-hidden="true"><span></span></div>
+                  <h2>你好，你想知道的我都有</h2>
+                  <p>输入一个问题，我会自动补全、分发给多个 AI、追问差异并生成对比报告。</p>
+                </section>
+                <div id="chat-flow" class="chat-flow" aria-live="polite"></div>
+
+                <article class="result-document result-document--store" aria-hidden="true">
                   <div id="mirror-sections" class="mirror-sections"></div>
 
                   <section class="document-section document-section--summary" aria-labelledby="summary-heading">
@@ -124,8 +131,8 @@
                 <div class="compare-panel__sheet">
                   <header class="compare-panel__head">
                     <div>
-                      <p class="compare-panel__eyebrow">Compare Overlay</p>
-                      <h2 id="compare-title">对比内容弹层</h2>
+                      <p class="compare-panel__eyebrow">Fact Black Box</p>
+                      <h2 id="compare-title">去伪存真情报报告</h2>
                     </div>
                     <button type="button" id="btnCloseCompare" class="toolbar-btn">关闭</button>
                   </header>
@@ -147,7 +154,7 @@
 
                   <footer class="compare-panel__foot">
                     <button type="button" id="btnCopyDiff" class="ghost">复制差异内容</button>
-                    <button type="button" id="btnExportPdf" class="primary alt">导出对比报告</button>
+                    <button type="button" id="btnExportPdf" class="primary alt">导出情报报告</button>
                   </footer>
                 </div>
               </aside>
@@ -200,7 +207,10 @@
 
     <script src="controller-registry.js"></script>
     <script src="evaluation-report-prompt.js"></script>
+    <script src="report-schema.js"></script>
     <script src="reporting.js"></script>
+    <script src="report-presenter.js"></script>
+    <script src="platform-brand.js"></script>
     <script src="platform-scaffold.js"></script>
     <script src="compare-panel.js"></script>
     <script src="report-session.js"></script>
@@ -211,6 +221,7 @@
     <script src="reply-quality.js"></script>
     <script src="user-preferences.js"></script>
     <script src="ai-conversation.js"></script>
+    <script src="chat-flow-presenter.js"></script>
     <script src="composer-presenter.js"></script>
     <script src="status-presenter.js"></script>
     <script src="analysis-orchestrator.js"></script>
@@ -221,6 +232,8 @@
     <script src="ui-wiring.js"></script>
     <script src="ui-wiring-composition.js"></script>
     <script src="workbench-bootstrap.js"></script>
+    <script src="truth-seeking-core.js"></script>
+    <script src="truth-seeking-prompts.js"></script>
     <script src="truth-seeking.js"></script>
     <script src="app-composition.js"></script>
     <script src="app.js"></script>

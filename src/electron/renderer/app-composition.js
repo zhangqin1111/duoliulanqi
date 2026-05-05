@@ -17,6 +17,20 @@
       });
     }
 
+    function chatFlowPresenter() {
+      return controller('chatFlowPresenter', {
+        moduleName: 'DuoliChatFlowPresenter',
+        factoryName: 'createChatFlowPresenter',
+        label: 'Chat flow presenter',
+        createDeps: () => ({
+          getEmptyEl: () => ctx.elements.chatEmptyEl,
+          getFlowEl: () => ctx.elements.chatFlowEl,
+          getThreadScrollEl: () => ctx.elements.threadScrollEl,
+          openComparePanel: ctx.actions.openComparePanel,
+        }),
+      });
+    }
+
     function platformScaffold() {
       return controller('platformScaffold', {
         moduleName: 'DuoliPlatformScaffold',
@@ -125,6 +139,11 @@
           getApi: ctx.getApi,
           getSummaryBodyEl: () => ctx.elements.summaryBodyEl,
           refreshComparePanel: ctx.actions.refreshComparePanel,
+          setFlowStage: ctx.actions.setFlowStage,
+          completeFlowStage: ctx.actions.completeFlowStage,
+          failFlowStage: ctx.actions.failFlowStage,
+          showCompareReadyCard: ctx.actions.showCompareReadyCard,
+          showDiffDetailsCard: ctx.actions.showDiffDetailsCard,
           chatPlatforms: ctx.actions.chatPlatforms,
           waitUntilGuestLoaded: ctx.actions.waitUntilGuestLoaded,
           setColStatus: ctx.actions.setColStatus,
@@ -146,6 +165,10 @@
           isQwenApiOk: ctx.isQwenApiOk,
           refreshComparePanel: ctx.actions.refreshComparePanel,
           runTruthSeekingAnalysis: ctx.actions.runTruthSeekingAnalysis,
+          setFlowStage: ctx.actions.setFlowStage,
+          completeFlowStage: ctx.actions.completeFlowStage,
+          failFlowStage: ctx.actions.failFlowStage,
+          showCompareReadyCard: ctx.actions.showCompareReadyCard,
           setSummaryStatus: ctx.actions.setSummaryStatus,
         }),
       });
@@ -170,7 +193,7 @@
         label: 'Question refiner',
         createDeps: () => ({
           getApi: ctx.getApi,
-          timeoutMs: 8000,
+          timeoutMs: 15000,
         }),
       });
     }
@@ -201,7 +224,7 @@
                 : '等待三站回复…';
           },
           minQuietAfterFirstReplyMs: userPreferences().minQuietAfterFirstReplyMs,
-          perPlatformTimeoutMs: 45000,
+          perPlatformTimeoutMs: 180000,
         }),
       });
     }
@@ -328,6 +351,7 @@
     return {
       aiConversation,
       analysisOrchestrator,
+      chatFlowPresenter,
       comparePanel,
       composerPresenter,
       embedBounds,

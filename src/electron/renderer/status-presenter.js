@@ -26,14 +26,22 @@
       if (body) body.textContent = text || '';
       const mirror = deps.getMirrorEl(id);
       if (mirror) mirror.textContent = text || '发送后将在这里同步展示模型回复。';
-      deps.refreshComparePanel();
+      try {
+        deps.refreshComparePanel();
+      } catch (error) {
+        console.warn('[duoli] refreshComparePanel failed in setColBody', error);
+      }
       deps.scrollThreadToBottom();
     }
 
     function setSummaryStatus(text) {
       const el = deps.getSummaryStatusEl();
       if (el) el.textContent = text || '';
-      deps.refreshComparePanel();
+      try {
+        deps.refreshComparePanel();
+      } catch (error) {
+        console.warn('[duoli] refreshComparePanel failed in setSummaryStatus', error);
+      }
     }
 
     function setBusy(busy) {

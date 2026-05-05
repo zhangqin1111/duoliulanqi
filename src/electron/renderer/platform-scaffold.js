@@ -10,7 +10,15 @@
     }
 
     function platformAvatar(cfg) {
+      const brand = global.DuoliPlatformBrand;
+      if (brand && typeof brand.platformAvatar === 'function') return brand.platformAvatar(cfg);
       return String(cfg && cfg.avatar ? cfg.avatar : (cfg && cfg.name ? cfg.name : '?')).slice(0, 2);
+    }
+
+    function platformLogo(cfg, className) {
+      const brand = global.DuoliPlatformBrand;
+      if (brand && typeof brand.renderLogo === 'function') return brand.renderLogo(cfg, className);
+      return `<span class="${escapeHtml(className || 'platform-logo')} is-fallback"><span>${escapeHtml(platformAvatar(cfg))}</span></span>`;
     }
 
     function platformAccentStyle(cfg) {
@@ -35,7 +43,7 @@
             (cfg) => `
               <section class="document-section document-section--reply" data-mirror-card="${cfg.id}">
                 <div class="document-section__title">
-                  <span class="mirror-dot" style="${platformAccentStyle(cfg)}"></span>
+                  ${platformLogo(cfg, 'mirror-logo')}
                   <span>${escapeHtml(cfg.name)}</span>
                 </div>
                 <pre id="mirror-${cfg.id}" class="document-pre">${escapeHtml(mirrorPlaceholder(cfg))}</pre>
@@ -54,7 +62,7 @@
                 <div class="embed-shell" style="${platformAccentStyle(cfg)}">
                   <div class="embed-head" data-drag-popout="${cfg.id}">
                     <div class="embed-brand">
-                      <span class="embed-avatar">${escapeHtml(platformAvatar(cfg))}</span>
+                      ${platformLogo(cfg, 'embed-avatar')}
                       <span>${escapeHtml(cfg.name)}</span>
                     </div>
                     <div class="embed-controls">

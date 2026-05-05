@@ -7,6 +7,14 @@
       return typeof getPlatforms === 'function' ? getPlatforms() : [];
     }
 
+    function platformLogo(cfg) {
+      const brand = global.DuoliPlatformBrand;
+      if (brand && typeof brand.renderLogo === 'function') {
+        return brand.renderLogo(cfg, 'dock-logo');
+      }
+      return String(cfg && cfg.name ? cfg.name : '?').slice(0, 1);
+    }
+
     function platformCardEl(id) {
       return document.querySelector(`.embed-col[data-id="${id}"]`);
     }
@@ -44,7 +52,10 @@
         return;
       }
       toolMenuEl.innerHTML = closeds
-        .map((cfg) => `<button type="button" data-restore-tool="${cfg.id}"><span>${cfg.name}</span><span>恢复</span></button>`)
+        .map(
+          (cfg) =>
+            `<button type="button" data-restore-tool="${cfg.id}"><span class="tool-menu__brand">${platformLogo(cfg)}<span>${cfg.name}</span></span><span>恢复</span></button>`
+        )
         .join('');
       toolMenuEl.querySelectorAll('[data-restore-tool]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -67,7 +78,7 @@
           const actionAttr = mode === 'detached' ? `data-redock-platform="${cfg.id}"` : `data-restore-collapsed="${cfg.id}"`;
           const extraClass = mode === 'detached' ? ' dock-icon--detached' : '';
           const title = mode === 'detached' ? `收回 ${cfg.name}` : `恢复 ${cfg.name}`;
-          return `<button type="button" class="dock-icon${extraClass}" data-platform="${cfg.id}" ${actionAttr} title="${title}">${cfg.name.slice(0, 1)}</button>`;
+          return `<button type="button" class="dock-icon${extraClass}" data-platform="${cfg.id}" ${actionAttr} title="${title}">${platformLogo(cfg)}</button>`;
         })
         .join('');
       dockIconsEl.querySelectorAll('[data-restore-collapsed]').forEach((btn) => {

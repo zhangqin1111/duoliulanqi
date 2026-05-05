@@ -19,8 +19,10 @@
     }
 
     function buildReportPayload(questionText) {
+      const sessionQuestion = analysisSession && analysisSession.question ? analysisSession.question : '';
+      const originalQuestion = analysisSession && analysisSession.originalQuestion ? analysisSession.originalQuestion : '';
       return deps.reporting().buildReportPayload({
-        questionText,
+        questionText: String(questionText || '').trim() || originalQuestion || sessionQuestion,
         summaryText: deps.getSummaryText(),
         rawReplies: collectRawReplies(),
         analysisSession,

@@ -65,17 +65,31 @@ async function qwenChatCompletion(userPrompt) {
     );
   }
   const model = process.env.DUOLI_QWEN_MODEL || 'qwen-plus';
-  const res = await fetch(QWEN_COMPAT_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: userPrompt }],
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutMs = Math.max(3000, Number(process.env.DUOLI_QWEN_COMPLETE_TIMEOUT_MS) || 60000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let res;
+  try {
+    res = await fetch(QWEN_COMPAT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    });
+  } catch (error) {
+    if (error && error.name === 'AbortError') {
+      throw new Error(`DashScope 请求超时（${timeoutMs}ms）`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg =

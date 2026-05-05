@@ -1,5 +1,6 @@
 (function attachReporting(global) {
   const promptApi = global.DuoliEvaluationReportPrompt || {};
+  const schemaApi = global.DuoliReportSchema || {};
   const EVALUATION_HEADINGS = Array.isArray(promptApi.headings)
     ? promptApi.headings
     : [
@@ -51,6 +52,13 @@
     return out.trim();
   }
 
+  function extractStructuredReport(summaryText, fallback) {
+    if (!schemaApi || typeof schemaApi.extractStructuredJson !== 'function') return null;
+    const raw = schemaApi.extractStructuredJson(summaryText);
+    if (!raw || typeof schemaApi.normalizeFactReport !== 'function') return null;
+    return schemaApi.normalizeFactReport(raw, fallback || {});
+  }
+
   function parseReportSections(summaryText) {
     const text = stripStructuredBlocks(summaryText);
     const sections = Object.fromEntries(REPORT_HEADINGS.map((heading) => [heading, '']));
@@ -83,9 +91,12 @@
   function extractCompareSection(summaryText, heading) {
     const sections = parseReportSections(summaryText);
     if (sections[heading]) return sections[heading];
-    if (heading === '相同观点') return sections['全局摘要：多模型能力全景与核心矛盾'] || '';
+    if (heading === '相同观点') return sections['战情驾驶舱'] || sections['全局摘要：多模型能力全景与核心矛盾'] || '';
     if (heading === '不同观点') {
       return [
+        sections['争议焦点热力图'],
+        sections['差异详情侦查台'],
+        sections['源头分析与最终裁决'],
         sections['二、 核心逻辑链路与信息能见度分析'],
         sections['四、 深层动因与价值观对齐探讨'],
       ]
@@ -123,8 +134,23 @@
     const data = input || {};
     const summaryText = String(data.summaryText || '').trim();
     const sections = parseReportSections(summaryText);
+    const structuredReport = extractStructuredReport(summaryText, {
+      question: String(data.questionText || '').trim(),
+      originalQuestion:
+        data.analysisSession && data.analysisSession.originalQuestion
+          ? String(data.analysisSession.originalQuestion || '').trim()
+          : '',
+    });
     const evaluation = {
       globalSummary: getSection(sections, '全局摘要：多模型能力全景与核心矛盾'),
+      executiveDashboard: getSection(sections, '战情驾驶舱'),
+      questionBrief: getSection(sections, '问题补全与分析任务书'),
+      factMap: getSection(sections, '事实脉络与证据地图'),
+      disputeHeatmap: getSection(sections, '争议焦点热力图'),
+      diffInspector: getSection(sections, '差异详情侦查台'),
+      evidenceFunnel: getSection(sections, '去伪存真证据漏斗'),
+      modelWitness: getSection(sections, '模型证人画像'),
+      finalVerdict: getSection(sections, '源头分析与最终裁决'),
       outputTrace: getSection(sections, '一、 输出脉络与事实坐标对比'),
       logicVisibility: getSection(sections, '二、 核心逻辑链路与信息能见度分析'),
       capabilitySpectrum: getSection(sections, '三、 能力光谱与场景割裂剖析'),
@@ -140,18 +166,33 @@
         ...evaluation,
         coreConclusion: getSection(sections, '核心结论').length
           ? getSection(sections, '核心结论')
-          : evaluation.globalSummary,
-        same: getSection(sections, '相同观点').length ? getSection(sections, '相同观点') : evaluation.outputTrace,
+          : evaluation.executiveDashboard.length
+            ? evaluation.executiveDashboard
+            : evaluation.globalSummary,
+        same: getSection(sections, '相同观点').length
+          ? getSection(sections, '相同观点')
+          : evaluation.factMap.length
+            ? evaluation.factMap
+            : evaluation.outputTrace,
         diff: getSection(sections, '不同观点').length ? getSection(sections, '不同观点') : evaluation.logicVisibility,
         keyDebates: getSection(sections, '关键争议').length
           ? getSection(sections, '关键争议')
-          : evaluation.capabilitySpectrum,
-        gaps: getSection(sections, '遗漏与盲区').length ? getSection(sections, '遗漏与盲区') : evaluation.alignmentCauses,
-        actions: getSection(sections, '行动建议').length ? getSection(sections, '行动建议') : evaluation.selectionStrategy,
+          : evaluation.diffInspector.length
+            ? evaluation.diffInspector
+            : evaluation.capabilitySpectrum,
+        gaps: getSection(sections, '遗漏与盲区').length
+          ? getSection(sections, '遗漏与盲区')
+          : evaluation.sourceDiagnosis || evaluation.alignmentCauses,
+        actions: getSection(sections, '行动建议').length
+          ? getSection(sections, '行动建议')
+          : evaluation.finalVerdict.length
+            ? evaluation.finalVerdict
+            : evaluation.selectionStrategy,
       },
       reportHeadings: EVALUATION_HEADINGS.slice(),
       rawReplies: Array.isArray(data.rawReplies) ? data.rawReplies : [],
       analysisSession: data.analysisSession || null,
+      structuredReport,
     };
   }
 
@@ -161,6 +202,7 @@
     sectionItems,
     parseReportSections,
     extractCompareSection,
+    extractStructuredReport,
     buildComparePrompt,
     buildReportPayload,
   };

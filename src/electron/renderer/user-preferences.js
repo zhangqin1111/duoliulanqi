@@ -1,11 +1,11 @@
 (function attachUserPreferences(global) {
-  const MIN_QUIET_AFTER_FIRST_REPLY_MS = 8000;
+  const MIN_QUIET_AFTER_FIRST_REPLY_MS = 18000;
 
   function createUserPreferences(deps) {
     function getReplyStableIdleMs() {
       const el = deps.getReplyIdleCheckbox();
-      if (!el) return 12000;
-      return el.checked ? 12000 : 0;
+      if (!el) return 18000;
+      return el.checked ? 18000 : 0;
     }
 
     function getAutoSummarizeAfterSend() {

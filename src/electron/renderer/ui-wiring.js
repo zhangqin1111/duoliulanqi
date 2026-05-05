@@ -311,17 +311,35 @@
     }
 
     async function resolveRefinedQuestion(raw) {
-      if (typeof deps.refineQuestion !== 'function' || !deps.isQwenApiOk()) {
-        return { refined: raw, original: raw, fellBack: true, reason: 'refiner unavailable' };
+      if (typeof deps.refineQuestion !== 'function') {
+        throw new Error('问题补全模块不可用，无法进入多模型分发。');
+      }
+      if (typeof deps.setFlowStage === 'function') {
+        deps.setFlowStage('refine', '正在补全问题', '正在把用户原始问题整理成可分发给多个 AI 的高质量任务。', 'active');
       }
       deps.setStatus('正在用千问补全问题…');
       try {
         const result = await deps.refineQuestion(raw);
-        if (result && result.refined) return result;
+        if (result && result.refined) {
+          if (typeof deps.completeFlowStage === 'function') {
+            const preview =
+              result.refined && result.refined !== raw
+                ? `已补全为：${String(result.refined).slice(0, 90)}${String(result.refined).length > 90 ? '…' : ''}`
+                : '千问确认原问题已足够清晰，直接进入多模型分发。';
+            deps.completeFlowStage('refine', preview);
+          }
+          return result;
+        }
+        throw new Error('千问没有返回有效的补全问题。');
       } catch (e) {
-        /* ignore — fall back below */
+        const msg = e && e.message ? e.message : String(e);
+        if (typeof deps.failFlowStage === 'function') {
+          deps.failFlowStage('refine', msg);
+        }
+        deps.setStatus(`补全失败：${msg}`);
+        if (e && typeof e === 'object') e.flowStage = 'refine';
+        throw e;
       }
-      return { refined: raw, original: raw, fellBack: true, reason: 'refine error' };
     }
 
     function wireSendButton() {
@@ -340,6 +358,8 @@
           return;
         }
         deps.setBusy(true);
+        if (typeof deps.resetChatFlow === 'function') deps.resetChatFlow();
+        if (typeof deps.appendUserChatMessage === 'function') deps.appendUserChatMessage(raw);
         deps.syncQuestionChip(raw);
         qEl.value = '';
         if (typeof deps.resizeComposerInput === 'function') deps.resizeComposerInput();
@@ -359,7 +379,13 @@
           } else {
             deps.setStatus('多模型并发执行中…');
           }
+          if (typeof deps.setFlowStage === 'function') {
+            deps.setFlowStage('dispatch', '正在分发给多个 AI', 'Kimi、豆包、元宝等窗口将同步收到同一个问题。', 'active');
+          }
           const results = await deps.runConcurrentAsk(dispatch);
+          if (typeof deps.completeFlowStage === 'function') {
+            deps.completeFlowStage('dispatch', '多模型回复已收集，开始进入结构化分析。');
+          }
           if (deps.getAutoSummarizeAfterSend() && deps.isQwenApiOk()) {
             deps.setSummaryStatus('三站已有结果，正在自动生成结构化对比…');
             await deps.runCompareAndSummarize(dispatch, { results, originalQuestion: raw });
@@ -368,6 +394,11 @@
             deps.setStatus('多模型发送完成，可继续点击“对比”生成结构化分析。');
           }
         } catch (e) {
+          if (e && e.flowStage === 'refine') {
+            /* refine stage already rendered the precise failure */
+          } else if (typeof deps.failFlowStage === 'function') {
+            deps.failFlowStage('dispatch', e.message || String(e));
+          }
           deps.setStatus(`失败：${e.message || e}`);
         } finally {
           deps.setBusy(false);
@@ -395,6 +426,8 @@
           return;
         }
         deps.setBusy(true);
+        if (typeof deps.resetChatFlow === 'function') deps.resetChatFlow();
+        if (typeof deps.appendUserChatMessage === 'function') deps.appendUserChatMessage(raw);
         deps.syncQuestionChip(raw);
         qEl.value = '';
         if (typeof deps.resizeComposerInput === 'function') deps.resizeComposerInput();
@@ -408,10 +441,17 @@
           } else {
             deps.setStatus('对比流程：多模型并发 -> 结构化总结');
           }
+          if (typeof deps.setFlowStage === 'function') {
+            deps.setFlowStage('dispatch', '正在分发给多个 AI', '多个 AI 正在并行作答，系统会等待回复稳定后再进入分析。', 'active');
+          }
           await deps.runCompareAndSummarize(dispatch, { originalQuestion: raw });
-          deps.openComparePanel();
           deps.setStatus('对比流程已完成。');
         } catch (e) {
+          if (e && e.flowStage === 'refine') {
+            /* refine stage already rendered the precise failure */
+          } else if (typeof deps.failFlowStage === 'function') {
+            deps.failFlowStage('report', e.message || String(e));
+          }
           deps.setStatus(`失败：${e.message || e}`);
           deps.setSummaryStatus(e.message || String(e));
         } finally {

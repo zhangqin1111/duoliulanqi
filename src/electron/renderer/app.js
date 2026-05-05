@@ -1,11 +1,8 @@
 const $ = (sel) => document.querySelector(sel);
 const statusEl = $('#status');
 const qEl = $('#q');
-const btnReload = $('#btnReload');
-const btnViewMode = $('#btnViewMode');
-const btnSettings = $('#btnSettings');
-const btnSend = $('#btnSend');
-const btnCompare = $('#btnCompare');
+const btnReload = $('#btnReload'), btnViewMode = $('#btnViewMode'), btnSettings = $('#btnSettings');
+const btnSend = $('#btnSend'), btnCompare = $('#btnCompare');
 const summaryBodyEl = $('#summary-body');
 const summaryStatusEl = $('#summary-status');
 const settingsPanel = $('#settings-panel');
@@ -13,7 +10,7 @@ const dashscopeKeyInput = $('#dashscope-key');
 const settingsKeySourceEl = $('#settings-key-source');
 const settingsMsgEl = $('#settings-msg');
 const questionChipEl = $('#question-chip');
-const threadScrollEl = $('#thread-scroll');
+const threadScrollEl = $('#thread-scroll'), chatEmptyEl = $('#chat-empty'), chatFlowEl = $('#chat-flow');
 const btnOpenCompare = $('#btnOpenCompare');
 const comparePanel = $('#compare-panel');
 const compareSameEl = $('#compare-same');
@@ -32,9 +29,7 @@ const btnActivateLicense = $('#btnActivateLicense');
 const btnClearLicense = $('#btnClearLicense');
 
 let api = null;
-/** @type {any[]} */
 let platforms = [];
-/** 是否已配置 DashScope 密钥（主进程检测） */
 let qwenApiOk = false;
 const guestLoaded = new Set();
 const platformVisibility = {};
@@ -77,6 +72,8 @@ function getAppComposition() {
         settingsMsgEl,
         questionChipEl,
         threadScrollEl,
+        chatEmptyEl,
+        chatFlowEl,
         btnOpenCompare,
         comparePanel,
         compareSameEl,
@@ -117,14 +114,17 @@ function getAppComposition() {
       actions: {
         applyHostMode,
         applyQwenStatus,
+        appendUserChatMessage,
         askOnePlatform,
         buildFillScript,
         buildReportPayload,
         chatPlatforms,
         closeComparePanel,
+        completeFlowStage,
         ensurePlatformVisibilityState,
         ensurePopoutButtons,
         ensureWorkbenchBoot,
+        failFlowStage,
         getAutoSummarizeAfterSend,
         getDifferenceText,
         getReplyStableIdleMs,
@@ -138,6 +138,7 @@ function getAppComposition() {
         renderPlatformScaffold,
         renderPlatformVisibility,
         renderToolMenu,
+        resetChatFlow,
         resizeComposerInput,
         runCompareAndSummarize,
         runConcurrentAsk,
@@ -147,6 +148,7 @@ function getAppComposition() {
         setBusy,
         setColBody,
         setColStatus,
+        setFlowStage,
         setLicenseLocked,
         setPlatformMode,
         setStatus,
@@ -155,6 +157,8 @@ function getAppComposition() {
         syncEmbedHosts,
         syncLicenseState,
         syncQuestionChip,
+        showCompareReadyCard,
+        showDiffDetailsCard,
         waitUntilGuestLoaded,
         wireExportPdf,
         wireLicenseGate,
@@ -176,6 +180,12 @@ function isPlausibleReplyText(text) {
 function getComposerPresenter() {
   return getAppComposition().composerPresenter();
 }
+
+function getChatFlowPresenter() {
+  return getAppComposition().chatFlowPresenter();
+}
+
+const resetChatFlow = () => getChatFlowPresenter().reset(), appendUserChatMessage = (text) => getChatFlowPresenter().appendUserMessage(text), setFlowStage = (key, title, detail, state) => getChatFlowPresenter().upsertStage(key, title, detail, state), completeFlowStage = (key, detail) => getChatFlowPresenter().completeStage(key, detail), failFlowStage = (key, detail) => getChatFlowPresenter().failStage(key, detail), showCompareReadyCard = (options) => getChatFlowPresenter().showResultCard(options || {}), showDiffDetailsCard = (diffs) => getChatFlowPresenter().showDiffDetailsCard(diffs);
 
 function syncQuestionChip(text) {
   getComposerPresenter().syncQuestionChip(text);
@@ -213,7 +223,11 @@ function getComparePanelController() {
 }
 
 function refreshComparePanel() {
-  getComparePanelController().refresh();
+  try {
+    getComparePanelController().refresh();
+  } catch (error) {
+    console.warn('[duoli] refreshComparePanel failed', error);
+  }
 }
 
 function openComparePanel() {
@@ -390,10 +404,6 @@ async function runConcurrentAsk(question) {
   return getAiConversationController().runConcurrentAsk(question);
 }
 
-/**
- * @param {string} question
- * @param {{ results?: Array<{ cfg: any, r: any }> }} [opt] 若已跑过 runConcurrentAsk 可传入，避免重复提问
- */
 async function runCompareAndSummarize(question, opt) {
   await getAnalysisOrchestrator().runCompareAndSummarize(question, opt);
 }
@@ -406,9 +416,6 @@ function schedulePushBounds() {
   getEmbedBoundsReporter().schedule();
 }
 
-/**
- * 在嵌入页内执行：React 受控输入需改 prototype setter；多数站不能只靠 Enter，要点「发送」。
- */
 function buildFillScript(text, cfg) {
   const builder = window.DuoliBrowserAutomation && window.DuoliBrowserAutomation.buildFillScript;
   if (typeof builder !== 'function') {
@@ -426,8 +433,18 @@ async function waitUntilGuestLoaded(id, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (guestLoaded.has(id)) return;
+    try {
+      const readyState = await api.guestExec(id, 'document.readyState');
+      if (readyState === 'interactive' || readyState === 'complete') {
+        guestLoaded.add(id);
+        return;
+      }
+    } catch (e) {
+      /* BrowserView may still be initializing. */
+    }
     await sleep(80);
   }
+  throw new Error(`${id} 页面加载超时`);
 }
 
 async function syncEmbedHosts() {

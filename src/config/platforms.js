@@ -39,6 +39,7 @@ function platform(id, name, url, ui = {}, extra = {}) {
     responseSelectors: commonResponseSelectors,
     defaultMode: 'visible',
     avatar: ui.avatar || name.slice(0, 1).toUpperCase(),
+    logoUrl: ui.logoUrl || '',
     accent: ui.accent || '#4d7bff',
     avatarBg: ui.avatarBg || '#eef3ff',
     avatarFg: ui.avatarFg || '#315fcb',
@@ -50,12 +51,14 @@ function platform(id, name, url, ui = {}, extra = {}) {
 module.exports = [
   platform('kimi', 'Kimi', 'https://kimi.moonshot.cn/', {
     avatar: 'K',
+    logoUrl: 'https://www.kimi.com/favicon.ico',
     accent: '#4d7bff',
     avatarBg: '#eef3ff',
     avatarFg: '#3167df',
   }),
   platform('doubao', 'Doubao', 'https://www.doubao.com/', {
     avatar: 'D',
+    logoUrl: 'https://lf-flow-web-cdn.doubao.com/obj/flow-doubao/doubao/chat/favicon.png',
     accent: '#ffb04c',
     avatarBg: '#fff3df',
     avatarFg: '#b86c10',
@@ -63,6 +66,7 @@ module.exports = [
   }),
   platform('yuanbao', 'Yuanbao', 'https://yuanbao.tencent.com/', {
     avatar: 'Y',
+    logoUrl: 'https://static.yuanbao.tencent.com/m/yuanbao-web/favicon_new@32.png',
     accent: '#67c082',
     avatarBg: '#eaf7ef',
     avatarFg: '#2d8a55',
@@ -73,6 +77,7 @@ module.exports = [
     'https://yiyan.baidu.com/',
     {
       avatar: 'W',
+      logoUrl: 'https://eb-static.cdn.bcebos.com/logo/favicon.ico',
       accent: '#f66a42',
       avatarBg: '#fff0ea',
       avatarFg: '#d45224',
@@ -107,6 +112,7 @@ module.exports = [
     'https://chat.deepseek.com/',
     {
       avatar: 'D',
+      logoUrl: 'https://www.deepseek.com/favicon.ico',
       accent: '#7a70ff',
       avatarBg: '#f0efff',
       avatarFg: '#5c4fe0',

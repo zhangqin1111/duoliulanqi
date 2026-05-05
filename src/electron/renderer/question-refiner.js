@@ -1,23 +1,31 @@
 (function attachQuestionRefiner(global) {
-  const DEFAULT_TIMEOUT_MS = 8000;
-  const MIN_LENGTH_FOR_REFINE = 4;
+  const DEFAULT_TIMEOUT_MS = 15000;
+  const MIN_LENGTH_FOR_REFINE = 2;
   const MAX_LENGTH_FOR_REFINE = 1200;
+  const DATE_HINT_RE = /(\d{4}[-/.年]\d{1,2}([-/月.]\d{1,2}日?)?|\d{1,2}月\d{1,2}日|昨天|今天|明天|上周|本周|下周|去年|今年|明年|近\d+[天周月年]|最近\d+[天周月年])/;
 
   function buildRefinePrompt(rawQuestion) {
+    const hasDateHint = DATE_HINT_RE.test(String(rawQuestion || ''));
     return [
-      '你是一名 prompt 工程师,负责把用户写得过于简短或模糊的提问,补全成一份适合直接交给多家大模型作答的"高质量提问"。',
+      '你是“滤镜工作台”的问题补全器。你的任务是把用户一句话问题补全成一条可以直接分发给多个 AI 窗口作答的高质量任务。',
       '',
-      '硬性约束:',
-      '1. 不得改变用户的核心意图、立场和领域;不得替用户补充事实结论。',
-      '2. 只在原问题明显缺背景/约束/期望粒度时才补全;原问题已经足够清晰就直接原样返回。',
-      '3. 补全方向只能在以下范围内:必要的背景前提、关键约束(语言/平台/受众/规模)、期望的输出结构与粒度、需要避免的误区。',
-      '4. 不要加礼貌用语、不要加前后缀说明,不要使用 Markdown 标题,不要"以下是补全后的问题"这种引导语。',
-      '5. 输出必须是单独一段或几段问题正文本身,直接可发送给模型。',
-      '6. 长度上限不超过原问题的 4 倍,且不超过 800 字。',
+      '补全目标：让后续系统能够基于多个 AI 的回答做差异抽取、原因追问、污染剔除和最终事实/观点报告。',
       '',
-      `用户原始问题:\n${rawQuestion}`,
+      '硬性约束：',
+      '1. 不改变用户核心意图，不替用户预设事实结论，不补充未经用户给出的具体事实。',
+      '2. 如果用户只是输入短话题、人物、事件或关键词，必须补全成“报告素材采集型问题”，不能原样返回。',
+      '3. 如果用户已经写得足够完整，只做轻微澄清，仍然输出一条可直接发送的问题。',
+      hasDateHint
+        ? '4. 用户原句包含日期或时间线索：必须沿用用户给出的时间，不要自行扩展、替换或新增时间范围。'
+        : '4. 用户没有明确日期：时间范围默认理解为“最近/当前”，不要添加具体年份、月份、日期或起止时间。',
+      '5. 输出必须要求模型按结构化字段回答，字段包括：事实脉络、确认事实、待核验说法、争议焦点、不同观点阵营、可能源头、风险提示、后续核验问题。',
+      '6. 不要求网页模型输出严格 JSON；后续报告 JSON 由系统统一生成。',
+      '7. 不要输出解释、标题、Markdown 包装、前后缀说明；只输出补全后的问题正文。',
+      '8. 长度控制在 120-360 字，复杂问题最多 800 字。',
       '',
-      '请直接输出补全后的问题正文:',
+      `用户原始问题：\n${String(rawQuestion || '').trim()}`,
+      '',
+      '请直接输出补全后的问题正文：',
     ].join('\n');
   }
 
@@ -31,7 +39,7 @@
 
   function withTimeout(promise, ms) {
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`question refine timeout after ${ms}ms`)), ms);
+      const timer = setTimeout(() => reject(new Error(`问题补全超时（${ms}ms）`)), ms);
       promise.then(
         (value) => {
           clearTimeout(timer);
@@ -45,12 +53,13 @@
     });
   }
 
-  function sanitizeRefinedText(refined, raw) {
-    let out = String(refined || '').trim();
-    out = out.replace(/^```[\w]*\s*/i, '').replace(/\s*```$/i, '').trim();
-    out = out.replace(/^(补全后的问题[:：]?\s*|以下是补全后的问题[:：]?\s*)/i, '').trim();
-    if (!out) return raw;
-    return out;
+  function sanitizeRefinedText(refined) {
+    return String(refined || '')
+      .trim()
+      .replace(/^```[\w]*\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .replace(/^(补全后的问题[:：]?\s*|以下是补全后的问题[:：]?\s*)/i, '')
+      .trim();
   }
 
   function createQuestionRefiner(deps) {
@@ -59,29 +68,31 @@
 
     async function refineQuestion(rawQuestion) {
       const raw = String(rawQuestion || '').trim();
+      if (shouldSkipRefine(raw)) {
+        throw new Error('问题为空或过短，无法进入补全流程。');
+      }
       const api = getApi();
       if (!api || typeof api.qwenComplete !== 'function') {
-        return { refined: raw, original: raw, fellBack: true, reason: 'qwenComplete unavailable' };
+        throw new Error('千问补全接口不可用，无法进入多模型分发。');
       }
-      if (shouldSkipRefine(raw)) {
-        return { refined: raw, original: raw, fellBack: true, reason: 'skip-by-length' };
+
+      const result = await withTimeout(api.qwenComplete(buildRefinePrompt(raw)), timeoutMs);
+      if (!result || !result.ok || !result.text) {
+        throw new Error((result && result.error) || '千问没有返回有效的补全问题。');
       }
-      try {
-        const r = await withTimeout(api.qwenComplete(buildRefinePrompt(raw)), timeoutMs);
-        if (!r || !r.ok || !r.text) {
-          return { refined: raw, original: raw, fellBack: true, reason: (r && r.error) || 'empty refine response' };
-        }
-        const refined = sanitizeRefinedText(r.text, raw);
-        const changed = refined !== raw;
-        return { refined, original: raw, fellBack: !changed, reason: changed ? '' : 'unchanged' };
-      } catch (error) {
-        return {
-          refined: raw,
-          original: raw,
-          fellBack: true,
-          reason: (error && error.message) || String(error),
-        };
+
+      const refined = sanitizeRefinedText(result.text);
+      if (!refined) {
+        throw new Error('千问返回内容为空，无法进入多模型分发。');
       }
+
+      return {
+        refined,
+        original: raw,
+        fellBack: false,
+        reason: '',
+        source: 'qwen',
+      };
     }
 
     return { refineQuestion };

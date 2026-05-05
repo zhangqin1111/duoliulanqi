@@ -8,7 +8,7 @@
         if (!summaryText || summaryText.startsWith('点击“对比”')) {
           btn.textContent = '暂无内容';
           setTimeout(() => {
-            btn.textContent = '导出对比报告';
+            btn.textContent = '导出情报报告';
           }, 1500);
           return;
         }
@@ -16,12 +16,18 @@
         btn.textContent = '生成中…';
         try {
           const api = deps.getApi ? deps.getApi() : deps.api;
-          const payload = deps.buildReportPayload(deps.getQuestionText ? deps.getQuestionText() : '');
+          const payload =
+            typeof deps.buildReportPayload === 'function'
+              ? deps.buildReportPayload(deps.getQuestionText ? deps.getQuestionText() : '')
+              : null;
+          if (!payload) {
+            throw new Error('报告数据为空，无法导出。');
+          }
           const result = await api.exportPdf(payload);
           if (result && result.ok) {
             btn.textContent = '✓ 已保存';
           } else if (result && result.error === 'canceled') {
-            btn.textContent = '导出对比报告';
+            btn.textContent = '导出情报报告';
           } else {
             btn.textContent = `失败：${(result && result.error) || '未知'}`;
           }
@@ -30,7 +36,7 @@
         } finally {
           setTimeout(() => {
             btn.disabled = false;
-            btn.textContent = '导出对比报告';
+            btn.textContent = '导出情报报告';
           }, 2500);
         }
       });

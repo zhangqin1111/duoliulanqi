@@ -17,6 +17,7 @@ const {
   assertLicenseValid,
 } = require('./license');
 const reportTemplate = require('./report/template');
+const factReportTemplate = require('./report/fact-template');
 
 function extractStructuredJson(summaryText) {
   const text = String(summaryText || '');
@@ -140,14 +141,17 @@ ipcMain.handle('duoli:export-pdf', async (_e, payload = {}) => {
   if (!summaryText && !hasRawReply) return { ok: false, error: 'Nothing to export.' };
 
   const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
-    title: '保存深度对比 PDF 报告',
-    defaultPath: path.join(app.getPath('documents'), `滤镜-多模型深度对比报告-${new Date().toISOString().slice(0, 10)}.pdf`),
+    title: '保存滤镜·多源大模型内容对比分析',
+    defaultPath: path.join(app.getPath('documents'), `滤镜·多源大模型内容对比分析-${new Date().toISOString().slice(0, 10)}.pdf`),
     filters: [{ name: 'PDF 文件', extensions: ['pdf'] }],
   });
   if (canceled || !filePath) return { ok: false, error: 'canceled' };
 
   const structured = extractStructuredJson(summaryText);
-  const html = reportTemplate.buildReportHtml(payload, structured);
+  const html =
+    structured && structured.executive_conclusion
+      ? factReportTemplate.buildReportHtml(payload, structured)
+      : reportTemplate.buildReportHtml(payload, structured);
   const tmpHtml = path.join(os.tmpdir(), `duoli_pdf_${Date.now()}.html`);
   fs.writeFileSync(tmpHtml, html, 'utf8');
 

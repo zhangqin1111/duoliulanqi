@@ -69,6 +69,48 @@
       })()`;
     }
 
+    function buildActivityScript() {
+      return `(function() {
+        function visible(el) {
+          if (!el || !el.getBoundingClientRect) return false;
+          var r = el.getBoundingClientRect();
+          if (r.width < 2 || r.height < 2) return false;
+          var st = window.getComputedStyle(el);
+          if (st.visibility === 'hidden' || st.display === 'none' || Number(st.opacity) === 0) return false;
+          return true;
+        }
+        var reasons = [];
+        var activeTextRe = /正在搜索|搜索中|正在分析|分析中|思考中|生成中|回答中|正在生成|正在运行\\s*Python|Python\\s*运行中|工具调用中|正在浏览|正在读取|检索中|联网搜索中|loading|thinking|generating|searching|running/i;
+        var stopTextRe = /停止|中止|取消生成|停止生成|stop|cancel/i;
+        var nodes = Array.prototype.slice.call(document.querySelectorAll('button, [role="button"], [aria-label], [title]'));
+        for (var i = 0; i < nodes.length; i++) {
+          var n = nodes[i];
+          if (!visible(n)) continue;
+          var label = [
+            n.innerText || '',
+            n.textContent || '',
+            n.getAttribute('aria-label') || '',
+            n.getAttribute('title') || '',
+            n.getAttribute('data-testid') || '',
+            n.className || ''
+          ].join(' ');
+          if (stopTextRe.test(label)) reasons.push('stop-control');
+        }
+        var textNodes = Array.prototype.slice.call(document.querySelectorAll('[class*="loading"], [class*="thinking"], [class*="pending"], [class*="tool"], [class*="search"], [class*="status"], [class*="progress"], [role="status"], [aria-live]'));
+        for (var j = textNodes.length - 1; j >= 0 && reasons.length < 8; j--) {
+          var el = textNodes[j];
+          if (!visible(el)) continue;
+          var text = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+          if (text && text.length < 260 && activeTextRe.test(text)) reasons.push('active-text');
+        }
+        var busy = Array.prototype.slice.call(document.querySelectorAll('[aria-busy="true"], [data-loading="true"], [class*="loading"], [class*="generating"], [class*="thinking"], [class*="pending"]'));
+        for (var k = 0; k < busy.length && reasons.length < 12; k++) {
+          if (visible(busy[k])) reasons.push('busy-node');
+        }
+        return { active: reasons.length > 0, reasons: reasons.slice(0, 12) };
+      })()`;
+    }
+
     async function extractPlausible(id, selectors, minLen) {
       const candidates = await guestExec(id, buildExtractScript(selectors, minLen));
       return pickFirstPlausible(candidates) || '';
@@ -116,9 +158,11 @@
       let lastDom = snippetBefore || '';
       while (Date.now() < deadline) {
         const candidates = await guestExec(id, buildExtractScript(responseSelectors, 8));
+        const activity = await guestExec(id, buildActivityScript()).catch(() => ({ active: false, reasons: [] }));
+        const isActive = !!(activity && activity.active);
         if (hints) {
           const hit = extractMatchesCompareFormat(candidates, hints);
-          if (hit) return hit;
+          if (hit && !isActive) return hit;
         }
         const dom = pickFirstPlausible(candidates) || '';
         const domLen = dom.length;
@@ -129,6 +173,8 @@
             if (domLen > lastLen) {
               lastLen = domLen;
               stableStr = dom;
+              stableSince = Date.now();
+            } else if (isActive) {
               stableSince = Date.now();
             } else if (dom === stableStr && Date.now() - stableSince >= idleMs) {
               if (firstGrowthAt && Date.now() - firstGrowthAt >= minQuietAfterFirst) {
@@ -149,13 +195,14 @@
         if (idleMs <= 0 && domGrew && dom.trim().length >= 12) {
           await sleep(450 + Math.random() * 250);
           const c2 = await guestExec(id, buildExtractScript(responseSelectors, 8));
+          const activity2 = await guestExec(id, buildActivityScript()).catch(() => ({ active: false, reasons: [] }));
           if (hints) {
             const hit2 = extractMatchesCompareFormat(c2, hints);
-            if (hit2) return hit2;
+            if (hit2 && !(activity2 && activity2.active)) return hit2;
           }
           const dom2 = pickFirstPlausible(c2) || '';
           const best = dom2.length >= dom.length ? dom2 : dom;
-          if (isPlausibleReplyText(best)) return best.trim();
+          if (isPlausibleReplyText(best) && !(activity2 && activity2.active)) return best.trim();
         }
         await sleep(550 + Math.random() * 350);
       }
@@ -218,20 +265,26 @@
       if (typeof deps.setSummaryStatus === 'function') deps.setSummaryStatus('三站并发中…');
 
       const chats = deps.chatPlatforms();
-      await Promise.all(chats.map((cfg) => deps.waitUntilGuestLoaded(cfg.id, 90000)));
       chats.forEach((cfg) => {
-        deps.setColStatus(cfg.id, '正在发送 / 等待回复…', '');
+        deps.setColStatus(cfg.id, '准备发送…', '');
         deps.setColBody(cfg.id, '');
       });
 
       const responseTimeoutMs = Number(deps.perPlatformTimeoutMs) || 45000;
       return Promise.all(
         chats.map(async (cfg) => {
-          const r = await askOnePlatform(cfg, question, {
-            replyStableIdleMs: idleMs,
-            responseTimeoutMs,
-            retries: 0,
-          });
+          let r;
+          try {
+            await deps.waitUntilGuestLoaded(cfg.id, 3000).catch(() => null);
+            deps.setColStatus(cfg.id, '正在写入并等待回复…', '');
+            r = await askOnePlatform(cfg, question, {
+              replyStableIdleMs: idleMs,
+              responseTimeoutMs,
+              retries: 0,
+            });
+          } catch (error) {
+            r = { ok: false, error: error && error.message ? error.message : String(error) };
+          }
           if (r.ok) {
             deps.setColStatus(cfg.id, '完成', 'ok');
             deps.setColBody(cfg.id, r.text || '');
