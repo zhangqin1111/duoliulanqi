@@ -24,6 +24,18 @@ contextBridge.exposeInMainWorld('duoliulan', {
     });
   },
   reportEmbedBounds: (slots) => ipcRenderer.send('embed:bounds', slots),
+  updateDockOverlay: (state) => ipcRenderer.send('dock-overlay:state', state),
+  sendDockOverlayAction: (action) => ipcRenderer.send('dock-overlay:action', action),
+  onDockOverlayAction: (fn) => {
+    const ch = (_e, payload) => fn(payload);
+    ipcRenderer.on('dock-overlay:action', ch);
+    return () => ipcRenderer.removeListener('dock-overlay:action', ch);
+  },
+  onDockOverlayState: (fn) => {
+    const ch = (_e, payload) => fn(payload);
+    ipcRenderer.on('dock-overlay:render', ch);
+    return () => ipcRenderer.removeListener('dock-overlay:render', ch);
+  },
   getEmbedHosts: () => ipcRenderer.invoke('duoli:get-embed-hosts'),
   popoutGuest: (id, bounds) => ipcRenderer.invoke('embed:popout', { id, bounds }),
   redockGuest: (id) => ipcRenderer.invoke('embed:redock', { id }),

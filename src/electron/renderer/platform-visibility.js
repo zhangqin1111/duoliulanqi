@@ -65,6 +65,29 @@
       });
     }
 
+    function updateDockOverlay() {
+      const bridge = global.duoliulan;
+      if (!bridge || typeof bridge.updateDockOverlay !== 'function') return;
+      const visible = !document.body.classList.contains('is-chat-mode');
+      const toItem = (cfg) => ({
+        id: cfg.id,
+        name: cfg.name,
+        avatar: cfg.avatar || cfg.name,
+        logoUrl: cfg.logoUrl || '',
+        mode: state[cfg.id]?.mode || cfg.defaultMode || 'visible',
+      });
+      bridge.updateDockOverlay({
+        visible,
+        closed: platforms().filter((cfg) => state[cfg.id]?.mode === 'closed').map(toItem),
+        icons: platforms()
+          .filter((cfg) => {
+            const mode = state[cfg.id]?.mode;
+            return mode === 'collapsed' || mode === 'detached';
+          })
+          .map(toItem),
+      });
+    }
+
     function renderDockIcons() {
       const dockIconsEl = deps.getDockIconsEl ? deps.getDockIconsEl() : null;
       if (!dockIconsEl) return;
@@ -122,6 +145,7 @@
       }
       renderDockIcons();
       renderToolMenu();
+      updateDockOverlay();
       if (typeof deps.schedulePushBounds === 'function') deps.schedulePushBounds();
     }
 
@@ -132,6 +156,7 @@
       render,
       renderDockIcons,
       renderToolMenu,
+      updateDockOverlay,
       restorePlatform,
       setPlatformMode,
     };

@@ -276,6 +276,22 @@
 
     function wireToolMenu() {
       const toolMenuEl = deps.getToolMenuEl();
+      if (window.duoliulan && typeof window.duoliulan.onDockOverlayAction === 'function') {
+        window.duoliulan.onDockOverlayAction((action) => {
+          if (!action || !action.type) return;
+          if (action.type === 'refresh') {
+            deps.getReloadButton()?.click();
+            return;
+          }
+          if (action.type === 'restore' && action.id) {
+            deps.setPlatformMode(action.id, 'visible');
+            return;
+          }
+          if (action.type === 'redock' && action.id && typeof deps.redockPlatform === 'function') {
+            deps.redockPlatform(action.id);
+          }
+        });
+      }
       $('#btnAddTool')?.addEventListener('click', (event) => {
         event.stopPropagation();
         if (!toolMenuEl) return;

@@ -246,7 +246,7 @@ function positionToolMenu() {
   const btnRect = addToolBtn.getBoundingClientRect();
   const bubbleWidth = Math.max(toolMenuEl.offsetWidth || 0, 184);
   const bubbleHeight = toolMenuEl.offsetHeight || 0;
-  const gap = 8;
+  const gap = 10;
   const top = Math.max(
     18,
     Math.min(btnRect.top - stageRect.top + btnRect.height / 2 - bubbleHeight / 2, stageEl.clientHeight - bubbleHeight - 18)
