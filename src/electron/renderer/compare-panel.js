@@ -107,6 +107,7 @@
       refresh();
       comparePanel.removeAttribute('hidden');
       document.body.classList.add('has-compare-open');
+      if (typeof deps.schedulePushBounds === 'function') deps.schedulePushBounds();
     }
 
     function close() {
@@ -114,6 +115,7 @@
       if (!comparePanel) return;
       comparePanel.setAttribute('hidden', '');
       document.body.classList.remove('has-compare-open');
+      if (typeof deps.schedulePushBounds === 'function') deps.schedulePushBounds();
     }
 
     function getDifferenceText() {

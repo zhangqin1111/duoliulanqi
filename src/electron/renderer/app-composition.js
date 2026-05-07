@@ -58,6 +58,7 @@
           getRawReplyText: ctx.getRawReplyText,
           getSummaryText: ctx.getSummaryText,
           reporting: ctx.reporting,
+          schedulePushBounds: ctx.actions.schedulePushBounds,
         }),
       });
     }

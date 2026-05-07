@@ -129,7 +129,11 @@
       } else {
         card.querySelector('.result-card__eyebrow').textContent = data.eyebrow || 'Fact Report Ready';
       }
-      card.querySelector('.result-card__button').addEventListener('click', () => {
+      card.querySelector('.result-card').addEventListener('click', () => {
+        if (typeof deps.openComparePanel === 'function') deps.openComparePanel();
+      });
+      card.querySelector('.result-card__button').addEventListener('click', (event) => {
+        event.stopPropagation();
         if (typeof deps.openComparePanel === 'function') deps.openComparePanel();
       });
       flowEl.appendChild(card);

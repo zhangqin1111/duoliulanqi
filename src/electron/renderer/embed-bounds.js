@@ -6,8 +6,12 @@
       const api = typeof deps.getApi === 'function' ? deps.getApi() : deps.api;
       const platforms = typeof deps.getPlatforms === 'function' ? deps.getPlatforms() : [];
       if (!api || !platforms.length || typeof api.reportEmbedBounds !== 'function') return;
+      const hideMainViews = document.body.classList.contains('has-compare-open');
       const slots = platforms
         .map((cfg) => {
+          if (hideMainViews) {
+            return { id: cfg.id, x: -20000, y: -20000, width: 0, height: 0 };
+          }
           const el = document.getElementById(`slot-${cfg.id}`);
           if (!el) return null;
           const r = el.getBoundingClientRect();
