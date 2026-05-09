@@ -326,7 +326,32 @@
       });
     }
 
-    async function resolveRefinedQuestion(raw) {
+    function routeQuestion(raw) {
+      if (typeof deps.routeQuestion !== 'function') {
+        return {
+          task_type: 'general_compare',
+          label: '通用多源对比',
+          confidence: 0.46,
+          reason: '任务路由器不可用，回退通用链路。',
+          recommended_workflow: 'general_compare_workflow',
+          recommended_template: 'general_compare_report',
+          risk_note: '',
+        };
+      }
+      const route = deps.routeQuestion(raw);
+      if (typeof deps.setFlowStage === 'function') {
+        deps.setFlowStage(
+          'refine',
+          '正在识别问题类型',
+          `已识别：${route.label}（置信度 ${Math.round((route.confidence || 0) * 100)}%）。${route.reason || ''}`,
+          'active'
+        );
+      }
+      deps.setStatus(`已识别任务类型：${route.label}`);
+      return route;
+    }
+
+    async function resolveRefinedQuestion(raw, taskRoute) {
       if (typeof deps.refineQuestion !== 'function') {
         throw new Error('问题补全模块不可用，无法进入多模型分发。');
       }
@@ -335,7 +360,7 @@
       }
       deps.setStatus('正在用千问补全问题…');
       try {
-        const result = await deps.refineQuestion(raw);
+        const result = await deps.refineQuestion(raw, { taskRoute });
         if (result && result.refined) {
           if (typeof deps.completeFlowStage === 'function') {
             const preview =
@@ -387,7 +412,8 @@
         }
         deps.setSummaryStatus('');
         try {
-          const { refined, fellBack } = await resolveRefinedQuestion(raw);
+          const taskRoute = routeQuestion(raw);
+          const { refined, fellBack } = await resolveRefinedQuestion(raw, taskRoute);
           const dispatch = refined || raw;
           deps.syncQuestionChip(dispatch);
           if (!fellBack && dispatch !== raw) {
@@ -404,7 +430,7 @@
           }
           if (deps.getAutoSummarizeAfterSend() && deps.isQwenApiOk()) {
             deps.setSummaryStatus('三站已有结果，正在自动生成结构化对比…');
-            await deps.runCompareAndSummarize(dispatch, { results, originalQuestion: raw });
+            await deps.runCompareAndSummarize(dispatch, { results, originalQuestion: raw, taskRoute });
             deps.setStatus('发送完成，并已生成结构化对比。');
           } else {
             deps.setStatus('多模型发送完成，可继续点击“对比”生成结构化分析。');
@@ -449,7 +475,8 @@
         if (typeof deps.resizeComposerInput === 'function') deps.resizeComposerInput();
         deps.setStatus('对比流程：多模型并发 -> 结构化总结');
         try {
-          const { refined, fellBack } = await resolveRefinedQuestion(raw);
+          const taskRoute = routeQuestion(raw);
+          const { refined, fellBack } = await resolveRefinedQuestion(raw, taskRoute);
           const dispatch = refined || raw;
           deps.syncQuestionChip(dispatch);
           if (!fellBack && dispatch !== raw) {
@@ -460,7 +487,7 @@
           if (typeof deps.setFlowStage === 'function') {
             deps.setFlowStage('dispatch', '正在分发给多个 AI', '多个 AI 正在并行作答，系统会等待回复稳定后再进入分析。', 'active');
           }
-          await deps.runCompareAndSummarize(dispatch, { originalQuestion: raw });
+          await deps.runCompareAndSummarize(dispatch, { originalQuestion: raw, taskRoute });
           deps.setStatus('对比流程已完成。');
         } catch (e) {
           if (e && e.flowStage === 'refine') {

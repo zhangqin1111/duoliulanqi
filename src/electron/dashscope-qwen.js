@@ -3,40 +3,31 @@ const path = require('path');
 const { app } = require('electron');
 
 const QWEN_COMPAT_URL =
-  process.env.DUOLI_QWEN_API_URL ||
-  'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+  process.env.DUOLI_QWEN_API_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
 
 function readKeyFromUserData() {
   try {
     if (!app || typeof app.getPath !== 'function') return '';
-    const p = path.join(app.getPath('userData'), 'dashscope-api-key.txt');
-    if (!fs.existsSync(p)) return '';
-    const line = fs.readFileSync(p, 'utf8').trim().split(/\r?\n/)[0];
-    return line ? line.trim() : '';
-  } catch (e) {
+    const filePath = path.join(app.getPath('userData'), 'dashscope-api-key.txt');
+    if (!fs.existsSync(filePath)) return '';
+    return fs.readFileSync(filePath, 'utf8').trim().split(/\r?\n/)[0].trim();
+  } catch (error) {
     return '';
   }
 }
 
-const BUILTIN_KEY = 'sk-a04ccc4fdca044fd81a2ad1900d1573e';
-
 function getDashScopeApiKey() {
-  const fromEnv =
-    process.env.DUOLI_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY || '';
-  if (fromEnv && String(fromEnv).trim()) return String(fromEnv).trim();
-  const fromFile = readKeyFromUserData();
-  if (fromFile && fromFile.trim()) return fromFile.trim();
-  return BUILTIN_KEY;
+  const fromEnv = process.env.DUOLI_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY || '';
+  if (String(fromEnv).trim()) return String(fromEnv).trim();
+  return readKeyFromUserData();
 }
 
 function getQwenKeyStatus() {
   const envRaw = process.env.DUOLI_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY || '';
-  if (envRaw && String(envRaw).trim().length >= 8) {
-    return { ok: true, source: 'env' };
-  }
+  if (envRaw && String(envRaw).trim().length >= 8) return { ok: true, source: 'env' };
   const file = readKeyFromUserData();
   if (file && file.length >= 8) return { ok: true, source: 'file' };
-  return { ok: true, source: 'builtin' };
+  return { ok: false, source: 'none' };
 }
 
 function isQwenConfigured() {
@@ -44,142 +35,197 @@ function isQwenConfigured() {
 }
 
 function saveDashScopeApiKeyToFile(key) {
-  const k = String(key || '').trim();
-  if (k.length < 8) throw new Error('密钥无效或过短');
+  const value = String(key || '').trim();
+  if (value.length < 8) throw new Error('密钥无效或过短');
   const dir = app.getPath('userData');
-  const p = path.join(dir, 'dashscope-api-key.txt');
+  const filePath = path.join(dir, 'dashscope-api-key.txt');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(p, `${k}\n`, 'utf8');
+  fs.writeFileSync(filePath, `${value}\n`, 'utf8');
 }
 
 function clearDashScopeApiKeyFile() {
-  const p = path.join(app.getPath('userData'), 'dashscope-api-key.txt');
-  if (fs.existsSync(p)) fs.unlinkSync(p);
+  const filePath = path.join(app.getPath('userData'), 'dashscope-api-key.txt');
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 }
 
-async function qwenChatCompletion(userPrompt) {
-  const apiKey = getDashScopeApiKey();
-  if (!apiKey) {
-    throw new Error(
-      '未配置千问 API Key：请在应用内「API 密钥设置」保存，或设置环境变量 DUOLI_DASHSCOPE_API_KEY / DASHSCOPE_API_KEY。'
-    );
-  }
-  const model = process.env.DUOLI_QWEN_MODEL || 'qwen-plus';
-  const controller = new AbortController();
-  const timeoutMs = Math.max(3000, Number(process.env.DUOLI_QWEN_COMPLETE_TIMEOUT_MS) || 60000);
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  let res;
-  try {
-    res = await fetch(QWEN_COMPAT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: userPrompt }],
-      }),
-    });
-  } catch (error) {
-    if (error && error.name === 'AbortError') {
-      throw new Error(`DashScope 请求超时（${timeoutMs}ms）`);
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function optionNumber(options, key, envName, fallback) {
+  const fromOptions = options && Number(options[key]);
+  if (Number.isFinite(fromOptions) && fromOptions > 0) return fromOptions;
+  const fromEnv = Number(process.env[envName]);
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+  return fallback;
+}
+
+function retryCount(options, envName, fallback) {
+  const value = optionNumber(options, 'retries', envName, fallback);
+  return Math.max(0, Math.min(4, Math.floor(value)));
+}
+
+function isRetryableError(error) {
+  const status = Number(error && error.status);
+  const message = String((error && error.message) || error || '');
+  return (
+    status === 429 ||
+    status >= 500 ||
+    /timeout|超时|AbortError|fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/i.test(message)
+  );
+}
+
+async function withRetry(operation, options, envName, fallbackRetries) {
+  const retries = retryCount(options, envName, fallbackRetries);
+  let lastError = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await operation(attempt);
+    } catch (error) {
+      lastError = error;
+      if (attempt >= retries || !isRetryableError(error)) break;
+      await sleep(Math.min(1600 * (attempt + 1), 5000));
     }
-    throw error;
-  } finally {
-    clearTimeout(timer);
   }
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg =
-      (data.error && (data.error.message || data.error.code)) ||
-      data.message ||
-      `${res.status} ${res.statusText || ''}`.trim();
-    throw new Error(msg || 'DashScope 请求失败');
-  }
-  const content = data.choices && data.choices[0] && data.choices[0].message;
-  const text = content && content.content;
-  if (!text || !String(text).trim()) {
-    throw new Error('千问 API 返回内容为空');
-  }
-  return String(text).trim();
+  throw lastError;
 }
 
-/**
- * 流式调用千问：每收到一段 delta 就调用 onChunk(delta: string)，结束时 resolve 全文。
- * @param {string} userPrompt
- * @param {(delta: string) => void} onChunk
- * @returns {Promise<string>} 完整文本
- */
-async function qwenChatCompletionStream(userPrompt, onChunk) {
+function requireApiKey() {
   const apiKey = getDashScopeApiKey();
   if (!apiKey) {
-    throw new Error(
-      '未配置千问 API Key：请在应用内「API 密钥设置」保存，或设置环境变量 DUOLI_DASHSCOPE_API_KEY / DASHSCOPE_API_KEY。'
-    );
+    throw new Error('未配置千问 API Key：请在应用内“API 设置”保存，或设置 DUOLI_DASHSCOPE_API_KEY / DASHSCOPE_API_KEY。');
   }
-  const model = process.env.DUOLI_QWEN_MODEL || 'qwen-plus';
-  const res = await fetch(QWEN_COMPAT_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      stream: true,
-      messages: [{ role: 'user', content: userPrompt }],
-    }),
+  return apiKey;
+}
+
+function timeoutError(timeoutMs) {
+  return new Error(`DashScope 请求超时（${timeoutMs}ms）`);
+}
+
+function buildRequestBody(model, userPrompt, stream) {
+  return JSON.stringify({
+    model,
+    stream: !!stream,
+    messages: [{ role: 'user', content: userPrompt }],
   });
+}
 
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    const msg =
-      (errData.error && (errData.error.message || errData.error.code)) ||
-      errData.message ||
-      `${res.status} ${res.statusText || ''}`.trim();
-    throw new Error(msg || 'DashScope 流式请求失败');
+async function qwenChatCompletion(userPrompt, options = {}) {
+  const apiKey = requireApiKey();
+  const model = process.env.DUOLI_QWEN_MODEL || 'qwen-plus';
+  const timeoutMs = Math.max(3000, optionNumber(options, 'timeoutMs', 'DUOLI_QWEN_COMPLETE_TIMEOUT_MS', 90000));
+
+  return withRetry(async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let res;
+    try {
+      res = await fetch(QWEN_COMPAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        signal: controller.signal,
+        body: buildRequestBody(model, userPrompt, false),
+      });
+    } catch (error) {
+      if (error && error.name === 'AbortError') throw timeoutError(timeoutMs);
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg =
+        (data.error && (data.error.message || data.error.code)) ||
+        data.message ||
+        `${res.status} ${res.statusText || ''}`.trim();
+      const error = new Error(msg || 'DashScope 请求失败');
+      error.status = res.status;
+      throw error;
+    }
+
+    const content = data.choices && data.choices[0] && data.choices[0].message;
+    const text = content && content.content;
+    if (!text || !String(text).trim()) throw new Error('千问 API 返回内容为空');
+    return String(text).trim();
+  }, options, 'DUOLI_QWEN_COMPLETE_RETRIES', 1);
+}
+
+function consumeSseLine(line, onChunk) {
+  const trimmed = line.trim();
+  if (!trimmed || !trimmed.startsWith('data:')) return '';
+  const payload = trimmed.slice(5).trim();
+  if (!payload || payload === '[DONE]') return '';
+  try {
+    const parsed = JSON.parse(payload);
+    const delta = parsed.choices?.[0]?.delta?.content || '';
+    if (delta && typeof onChunk === 'function') onChunk(delta);
+    return delta;
+  } catch (error) {
+    return '';
   }
+}
 
-  // 读取 SSE 流
-  const decoder = new TextDecoder('utf-8');
-  let full = '';
-  let buf = '';
+async function qwenChatCompletionStream(userPrompt, onChunk, options = {}) {
+  const apiKey = requireApiKey();
+  const model = process.env.DUOLI_QWEN_MODEL || 'qwen-plus';
+  const timeoutMs = Math.max(3000, optionNumber(options, 'timeoutMs', 'DUOLI_QWEN_STREAM_TIMEOUT_MS', 240000));
 
-  for await (const chunk of res.body) {
-    buf += decoder.decode(chunk, { stream: true });
-    const lines = buf.split('\n');
-    buf = lines.pop(); // 最后一行可能不完整，留到下次
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith('data:')) continue;
-      const payload = trimmed.slice(5).trim();
-      if (payload === '[DONE]') break;
-      try {
-        const parsed = JSON.parse(payload);
-        const delta = parsed.choices?.[0]?.delta?.content || '';
-        if (delta) {
-          full += delta;
-          onChunk(delta);
+  return withRetry(async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let res;
+    try {
+      res = await fetch(QWEN_COMPAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        signal: controller.signal,
+        body: buildRequestBody(model, userPrompt, true),
+      });
+    } catch (error) {
+      clearTimeout(timer);
+      if (error && error.name === 'AbortError') throw timeoutError(timeoutMs);
+      throw error;
+    }
+
+    if (!res.ok) {
+      clearTimeout(timer);
+      const errData = await res.json().catch(() => ({}));
+      const msg =
+        (errData.error && (errData.error.message || errData.error.code)) ||
+        errData.message ||
+        `${res.status} ${res.statusText || ''}`.trim();
+      const error = new Error(msg || 'DashScope 流式请求失败');
+      error.status = res.status;
+      throw error;
+    }
+
+    const decoder = new TextDecoder('utf-8');
+    let full = '';
+    let buf = '';
+    try {
+      for await (const chunk of res.body) {
+        buf += decoder.decode(chunk, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          full += consumeSseLine(line, onChunk);
         }
-      } catch (_) {}
+      }
+      full += consumeSseLine(buf, onChunk);
+    } finally {
+      clearTimeout(timer);
     }
-  }
-  // 处理缓冲区剩余
-  if (buf.trim().startsWith('data:')) {
-    const payload = buf.trim().slice(5).trim();
-    if (payload && payload !== '[DONE]') {
-      try {
-        const parsed = JSON.parse(payload);
-        const delta = parsed.choices?.[0]?.delta?.content || '';
-        if (delta) { full += delta; onChunk(delta); }
-      } catch (_) {}
-    }
-  }
 
-  if (!full.trim()) throw new Error('千问 API 流式返回内容为空');
-  return full.trim();
+    if (!full.trim()) throw new Error('千问 API 流式返回内容为空');
+    return full.trim();
+  }, options, 'DUOLI_QWEN_STREAM_RETRIES', 1);
 }
 
 module.exports = {

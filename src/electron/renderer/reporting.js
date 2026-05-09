@@ -134,12 +134,17 @@
     const data = input || {};
     const summaryText = String(data.summaryText || '').trim();
     const sections = parseReportSections(summaryText);
+    const taskRoute =
+      data.taskRoute ||
+      (data.analysisSession && data.analysisSession.taskRoute ? data.analysisSession.taskRoute : null);
     const structuredReport = extractStructuredReport(summaryText, {
       question: String(data.questionText || '').trim(),
       originalQuestion:
         data.analysisSession && data.analysisSession.originalQuestion
           ? String(data.analysisSession.originalQuestion || '').trim()
           : '',
+      taskRoute,
+      taskType: taskRoute && taskRoute.task_type ? taskRoute.task_type : 'general_compare',
     });
     const evaluation = {
       globalSummary: getSection(sections, '全局摘要：多模型能力全景与核心矛盾'),
@@ -192,6 +197,7 @@
       reportHeadings: EVALUATION_HEADINGS.slice(),
       rawReplies: Array.isArray(data.rawReplies) ? data.rawReplies : [],
       analysisSession: data.analysisSession || null,
+      taskRoute,
       structuredReport,
     };
   }

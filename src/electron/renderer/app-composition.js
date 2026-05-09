@@ -27,6 +27,7 @@
           getFlowEl: () => ctx.elements.chatFlowEl,
           getThreadScrollEl: () => ctx.elements.threadScrollEl,
           openComparePanel: ctx.actions.openComparePanel,
+          onRecoveryAction: ctx.actions.handleRecoveryAction,
         }),
       });
     }
@@ -199,6 +200,14 @@
       });
     }
 
+    function taskRouter() {
+      return controller('taskRouter', {
+        moduleName: 'DuoliTaskRouter',
+        factoryName: 'createTaskRouter',
+        label: 'Task router',
+      });
+    }
+
     function aiConversation() {
       return controller('aiConversation', {
         moduleName: 'DuoliAiConversation',
@@ -365,6 +374,7 @@
       reportSession,
       statusPresenter,
       questionRefiner,
+      taskRouter,
       truthSeekingRunner,
       uiWiring,
       userPreferences,

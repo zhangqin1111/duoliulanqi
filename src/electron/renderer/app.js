@@ -128,12 +128,14 @@ function getAppComposition() {
         getAutoSummarizeAfterSend,
         getDifferenceText,
         getReplyStableIdleMs,
+        handleRecoveryAction,
         mirrorEl,
         openComparePanel,
         popoutPlatform,
         positionToolMenu,
         redockPlatform,
         refineQuestion,
+        routeQuestion,
         refreshComparePanel,
         renderPlatformScaffold,
         renderPlatformVisibility,
@@ -186,6 +188,31 @@ function getChatFlowPresenter() {
 }
 
 const resetChatFlow = () => getChatFlowPresenter().reset(), appendUserChatMessage = (text) => getChatFlowPresenter().appendUserMessage(text), setFlowStage = (key, title, detail, state) => getChatFlowPresenter().upsertStage(key, title, detail, state), completeFlowStage = (key, detail) => getChatFlowPresenter().completeStage(key, detail), failFlowStage = (key, detail) => getChatFlowPresenter().failStage(key, detail), showCompareReadyCard = (options) => getChatFlowPresenter().showResultCard(options || {}), showDiffDetailsCard = (diffs) => getChatFlowPresenter().showDiffDetailsCard(diffs);
+
+async function handleRecoveryAction(action) {
+  const id = action && action.id;
+  if (id === 'retry_stage') {
+    const question = qEl ? qEl.value.trim() : '';
+    if (question) await runCompareAndSummarize(question);
+    return;
+  }
+  if (id === 'generate_with_current_materials' || id === 'skip_failed_model') {
+    openComparePanel();
+    return;
+  }
+  if (id === 'export_diagnostics' && api && typeof api.exportDiagnosticPackage === 'function') {
+    const payload = buildReportPayload(qEl ? qEl.value.trim() : '');
+    const result = await api.exportDiagnosticPackage({
+      task: {
+        question: payload.question,
+        taskRoute: payload.taskRoute,
+      },
+      structuredReport: payload.structuredReport || {},
+      log: summaryBodyEl ? summaryBodyEl.textContent : '',
+    });
+    setSummaryStatus(result && result.ok ? `诊断包已导出：${result.dir}` : '诊断包导出失败');
+  }
+}
 
 function syncQuestionChip(text) {
   getComposerPresenter().syncQuestionChip(text);
@@ -396,8 +423,16 @@ function getQuestionRefiner() {
   return getAppComposition().questionRefiner();
 }
 
-async function refineQuestion(rawQuestion) {
-  return getQuestionRefiner().refineQuestion(rawQuestion);
+async function refineQuestion(rawQuestion, opt) {
+  return getQuestionRefiner().refineQuestion(rawQuestion, opt);
+}
+
+function getTaskRouter() {
+  return getAppComposition().taskRouter();
+}
+
+function routeQuestion(rawQuestion) {
+  return getTaskRouter().routeQuestion(rawQuestion);
 }
 
 async function runConcurrentAsk(question) {

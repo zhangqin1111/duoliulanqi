@@ -12,14 +12,23 @@ contextBridge.exposeInMainWorld('duoliulan', {
   getQwenConfigured: () => ipcRenderer.invoke('duoli:qwen-configured'),
   saveDashScopeKey: (key) => ipcRenderer.invoke('duoli:save-dashscope-key', { key }),
   clearDashScopeKeyFile: () => ipcRenderer.invoke('duoli:clear-dashscope-key-file'),
-  qwenComplete: (prompt) => ipcRenderer.invoke('duoli:qwen-complete', { prompt }),
+  qwenComplete: (prompt, options) => ipcRenderer.invoke('duoli:qwen-complete', { prompt, options }),
   exportPdf: (payload) => ipcRenderer.invoke('duoli:export-pdf', payload),
+  listReportHistory: () => ipcRenderer.invoke('duoli:report-history-list'),
+  addReportHistory: (item) => ipcRenderer.invoke('duoli:report-history-add', item),
+  removeReportHistory: (id) => ipcRenderer.invoke('duoli:report-history-remove', { id }),
+  exportDiagnosticPackage: (data) => ipcRenderer.invoke('duoli:diagnostic-package', data),
+  listAiProviders: () => ipcRenderer.invoke('duoli:ai-providers'),
+  providerComplete: (providerId, prompt, options) =>
+    ipcRenderer.invoke('duoli:ai-provider-complete', { providerId, prompt, options }),
+  getRemoteConfig: () => ipcRenderer.invoke('duoli:remote-config'),
+  searchEvidence: (payload) => ipcRenderer.invoke('duoli:evidence-search', payload),
   // 流式千问：返回 Promise<{ok,text,error}>，过程中 onChunk(delta) 实时回调
-  qwenStream: (prompt, onChunk) => {
+  qwenStream: (prompt, onChunk, options) => {
     const reqId = `qs_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const off = (_e, msg) => { if (msg.reqId === reqId && onChunk) onChunk(msg.delta); };
     ipcRenderer.on('duoli:qwen-stream-chunk', off);
-    return ipcRenderer.invoke('duoli:qwen-stream', { prompt, reqId }).finally(() => {
+    return ipcRenderer.invoke('duoli:qwen-stream', { prompt, reqId, options }).finally(() => {
       ipcRenderer.removeListener('duoli:qwen-stream-chunk', off);
     });
   },

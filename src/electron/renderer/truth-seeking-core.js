@@ -35,9 +35,9 @@
     return null;
   }
 
-  async function qwenJson(api, prompt, fallback) {
+  async function qwenJson(api, prompt, fallback, options) {
     if (!api || typeof api.qwenComplete !== 'function') return fallback;
-    const r = await api.qwenComplete(prompt);
+    const r = await api.qwenComplete(prompt, options || { timeoutMs: 120000, retries: 1 });
     if (!r || !r.ok) {
       throw new Error((r && r.error) || 'Qwen JSON request failed.');
     }

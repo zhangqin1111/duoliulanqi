@@ -37,6 +37,18 @@
     const diffAnalyses = data.diffAnalyses ? JSON.stringify(data.diffAnalyses, null, 2) : '[]';
     const pollution = data.pollution ? JSON.stringify(data.pollution, null, 2) : '{}';
     const selfCleansing = data.selfCleansing ? JSON.stringify(data.selfCleansing, null, 2) : 'null';
+    const taskRoute = data.taskRoute || {};
+    const taskLabel = taskRoute.label || taskRoute.task_type || '通用多源对比';
+    const taskWorkflow = taskRoute.recommended_workflow || 'general_compare_workflow';
+    const taskTemplate = taskRoute.recommended_template || 'general_compare_report';
+    const highRisk = data.highRisk || {};
+    const evidencePlan = data.evidencePlan || {};
+    const evidencePack = data.evidencePack || {};
+    const workflowRegistry = global.DuoliWorkflowRegistry;
+    const workflow =
+      workflowRegistry && typeof workflowRegistry.resolve === 'function' ? workflowRegistry.resolve(taskRoute) : null;
+    const workflowReportAddon =
+      workflow && typeof workflow.buildReportPromptAddon === 'function' ? workflow.buildReportPromptAddon({ taskRoute }) : '';
 
     const lines = [
       '# 角色与任务',
@@ -51,15 +63,21 @@
       '4. 必须形成一个贯穿全文的“核心矛盾”，例如事实坐标不一致、时间边界漂移、因果链路失配、证据强度不足等。',
       '5. 所有量化指标必须给出 0-100 分或整数数量；若依据不足，用保守估算，但不可假装精确测量。',
       '6. 用户没有明确日期时，必须按“最近/当前”处理；禁止自行添加具体年份、月份、日期或起止时间。用户给了明确日期时，严格使用用户日期。',
+      '6.1 如果是消费选购或同系列机型对比，不能因为模型未附官网 URL、知识截止较早、或缺少发布会/开发者文档证据，就直接判定用户指定产品不存在；应把这类问题写成信息缺口，并继续围绕用户指定系列给出条件化对比和待核验项。',
       '7. 语言要像咨询公司 + 舆情情报室 + AI 实验室联合出品：极度精炼、专业、高信息密度，优先使用“结构化失配”“信息能见度赤字”“证据链收敛”“污染剔除”“模型证人”等术语。',
       '8. 写法必须是“裁决式”，不是“解释式”：优先短句、强判断、少铺垫。每个核心页面都要让老板 30 秒内知道有没有事件、要不要响应、下一步做什么。',
+      highRisk && highRisk.highRisk
+        ? `8.1 高风险边界：本题属于 ${highRisk.riskDomain || 'high_risk'}，允许模式为 ${highRisk.allowedMode || 'screening'}。严禁输出：${(highRisk.blockedClaims || []).join('、') || '越权承诺'}。必须写入边界提示：${(highRisk.requiredDisclaimers || []).join('；') || '仅作风险筛查'}。下一步建议必须包含：${highRisk.escalationAdvice || '补充权威材料后复核'}。`
+        : '',
       '9. executive_conclusion.one_sentence 必须是可拍板句式，例如“当前仅存在 1 个闭环事实，其余主张全部降权/不可采信”。不要写成温和综述。',
-      '10. user_issue_analysis.direct_answer 第一行必须直接回答用户真正问题，例如“结论：当前不存在新的可验证舆情事件，仅为历史事件延续讨论。”',
+      '10. user_issue_analysis.direct_answer 第一行必须直接回答用户真正问题。舆情题回答有没有舆情；事实题回答真假；消费选购题回答最值得买；技术题回答根因和第一步；创作题回答首选方案；医疗/金融题先给风险分层和审慎边界。',
       '11. dispute_map.items 每项必须能被压缩成三行：问题、裁决、原因；retained_judgment 写“裁决”，why_it_matters 写“原因”，避免论文式长段落。',
+      `12. 系统已识别任务类型为“${taskLabel}”，推荐工作流为“${taskWorkflow}”，推荐报告模板为“${taskTemplate}”。报告结构必须优先服务这个场景。`,
+      workflowReportAddon ? `13. 场景化报告规则：${workflowReportAddon}` : '',
     ];
     if (wasRefined) {
       lines.push(
-        '12. 用户原始提问与系统补全后的下发问题不一致：必须说明补全是否影响了模型回答和最终判断。'
+        '14. 用户原始提问与系统补全后的下发问题不一致：必须说明补全是否影响了模型回答和最终判断。'
       );
     }
     lines.push(
@@ -81,14 +99,15 @@
       '',
       '# 结构化 JSON(必填,放在所有章节之后)',
       '在【数据可视化组件规格】之后，必须追加一个独立代码块，起止严格用 ```json 和 ```，内容为单个 JSON 对象。前端报告完全依赖这个 JSON 渲染，结构必须完整可解析。',
-      'JSON 顶层字段必须包含：meta、executive_conclusion、question_brief、user_issue_analysis、fact_map、dispute_map、evidence_funnel、model_profiles、source_diagnosis、final_actions。',
-      '其中 user_issue_analysis 为核心字段，必须用于直接回答用户问题；如果用户问舆论，就输出舆情温度、情绪结构、阵营/群体、主要叙事、风险矩阵；如果不是舆论题，也要转写为该问题的结果研判、关键发现、风险矩阵。',
+      'JSON 顶层字段必须包含：meta、executive_conclusion、scenario_decision、question_brief、user_issue_analysis、fact_map、dispute_map、evidence_funnel、model_profiles、source_diagnosis、final_actions。',
+      '其中 user_issue_analysis 为核心字段，必须用于直接回答用户问题；如果用户问舆论，就输出舆情温度、情绪结构、阵营/群体、主要叙事、风险矩阵；如果用户问消费选购，就把 sentiment_distribution 写成价值构成，把 stance_distribution 写成推荐梯队，把 audience_segments 写成购买人群坐标，把 risk_matrix 写成购买风险矩阵；如果不是舆论题，也要转写为该问题的结果研判、关键发现、风险矩阵。',
       '不要输出旧版模型评测字段，不要输出 scoreboard/core_tension/selection_quadrant/info_funnel/alignment_tax/fact_sankey。报告数据以事实黑匣子新结构为准。',
       '',
       'JSON schema：',
       '{',
-      '  "meta": {"question_original":"用户原始问题","question_refined":"实际下发问题","generated_at":"ISO 时间或空字符串","models":["模型名"],"workflow_rounds":3},',
+      '  "meta": {"question_original":"用户原始问题","question_refined":"实际下发问题","generated_at":"ISO 时间或空字符串","models":["模型名"],"workflow_rounds":3,"task_type":"public_opinion | fact_check | competitor_analysis | consumer_purchase | investment_research | legal_risk | knowledge_brief | creative_content | technical_diagnosis | learning_research | travel_lifestyle | career_recruiting | medical_health | finance_planning | general_compare","task_label":"任务中文名","workflow":"推荐工作流","template":"推荐报告模板"},',
       '  "executive_conclusion": {"one_sentence":"直接回答用户问题","status":"strong | weak | disputed | insufficient","confidence_score":0,"confidence_label":"中高可信/待核验等","core_tension":"核心矛盾","largest_uncertainty":"最大不确定性","risk_level":"low | medium | high"},',
+      '  "scenario_decision": {"task_type":"任务类型","task_label":"任务中文名","decision_object":"本次裁决对象","direct_verdict":"一句话场景裁决","recommended_action":"建议动作","evidence_standard":"本场景采信标准","do_not_overread":["不能误读/不能外推的点"],"decision_factors":[{"label":"关键因素","score":0,"note":"为什么重要"}],"next_questions":["还必须追问或核验的问题"]},',
       '  "question_brief": {"original":"原始问题","refined":"补全问题","constraints":["约束"],"analysis_goals":["目标"]},',
       '  "user_issue_analysis": {"direct_answer":"用 120-220 字直接回答用户到底想知道的结果","public_opinion_temperature":0,"temperature_label":"低热/中热/高热/爆发","dominant_sentiment":"主导情绪或主导判断","sentiment_distribution":[{"label":"正向/中性/负向/嘲讽/质疑等","value":0,"note":"依据"}],"stance_distribution":[{"label":"支持/观望/质疑/反感/路人等","value":0,"note":"依据"}],"audience_segments":[{"label":"粉丝/路人/媒体/平台用户等","heat":0,"credibility":0,"weight":0,"narrative":"该群体主要说法"}],"key_findings":["关键发现"],"narrative_summary":"主要舆论叙事如何形成","risk_matrix":[{"title":"风险标题","impact":0,"probability":0,"mitigation":"应对或核验动作"}],"blindspots":["盲区"]},',
       '  "fact_map": {"timeline":[{"id":"F1","time":"最近/当前或用户指定时间","event":"事实点","status":"confirmed | disputed | uncertain | polluted","sources":["模型名"],"note":"说明"}],"confirmed_facts":[],"uncertain_claims":[],"polluted_claims":[]},',
@@ -106,6 +125,38 @@
       '# 参与模型',
       modelNames || '未识别模型名称'
     );
+    lines.push(
+      '',
+      '# 系统任务路由',
+      `任务类型：${taskLabel}`,
+      `推荐工作流：${taskWorkflow}`,
+      `推荐报告模板：${taskTemplate}`,
+      taskRoute.reason ? `识别理由：${taskRoute.reason}` : '',
+      taskRoute.risk_note ? `风险提示：${taskRoute.risk_note}` : ''
+    );
+    if (evidencePlan && Array.isArray(evidencePlan.queries) && evidencePlan.queries.length) {
+      lines.push(
+        '',
+        '# 待核验证据查询计划',
+        '以下查询不是已完成搜索结果，只能作为报告中的“下一步核验动作”和“证据缺口”使用，不能当作已验证事实：',
+        ...evidencePlan.queries.map((query) => `- ${query}`)
+      );
+    }
+    if (evidencePack && Array.isArray(evidencePack.items) && evidencePack.items.length) {
+      lines.push(
+        '',
+        '# 已检索候选证据',
+        '以下内容来自配置的搜索/证据 API。仍需在报告中区分“候选证据”和“已验证事实”，不得把低可信结果直接写成强结论：',
+        ...evidencePack.items.slice(0, 8).map((item, index) => {
+          const title = item.title || `证据${index + 1}`;
+          const source = item.source || item.url || 'unknown';
+          const snippet = item.snippet || '';
+          return `- ${title}｜${source}｜可信度 ${item.credibility || 0}｜${snippet}`;
+        })
+      );
+    } else if (evidencePack && evidencePack.error) {
+      lines.push('', '# 证据检索状态', `证据检索失败或未配置：${evidencePack.error}`);
+    }
     if (wasRefined) {
       lines.push(
         '',

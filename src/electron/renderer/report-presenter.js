@@ -153,6 +153,34 @@
     `;
   }
 
+  function renderScenarioDecision(scenario) {
+    const data = scenario || {};
+    const factors = array(data.decision_factors);
+    return `
+      <section class="intel-block intel-block--wide">
+        <div class="intel-block__head">
+          <span>场景裁决层</span>
+          <em>${escapeHtml(data.task_label || data.task_type || 'Scenario')}</em>
+        </div>
+        <div class="intel-verdict">
+          <b>场景裁决</b>
+          <p>${escapeHtml(data.direct_verdict || '暂未形成场景裁决')}</p>
+          <b>建议动作</b>
+          <p>${escapeHtml(data.recommended_action || '继续核验')}</p>
+          <b>采信标准</b>
+          <p>${escapeHtml(data.evidence_standard || '只采信经过交叉验证和污染剔除后仍成立的判断。')}</p>
+          <b>关键因素</b>
+          <div class="intel-tags">${renderTags(
+            factors.map((item) => `${item.label || '因素'} ${item.score || 0}/100`),
+            '暂无关键因素'
+          )}</div>
+          <b>不可误读</b>
+          <div class="intel-tags">${renderTags(data.do_not_overread, '不能把模型一致性直接等同于事实成立')}</div>
+        </div>
+      </section>
+    `;
+  }
+
   function renderModelProfiles(models) {
     const list = array(models);
     return `
@@ -221,6 +249,7 @@
     const disputeMap = report.dispute_map || {};
     const diagnosis = report.source_diagnosis || {};
     const funnel = report.evidence_funnel || {};
+    const scenarioDecision = report.scenario_decision || {};
     return `
       <article class="intel-report">
         <section class="intel-hero">
@@ -262,6 +291,7 @@
         <div class="intel-grid">
           ${renderFactList('事实时间轴', factMap.timeline, '暂无时间轴')}
           ${renderFactList('多模型确认事实', factMap.confirmed_facts, '暂无确认事实')}
+          ${renderScenarioDecision(scenarioDecision)}
           ${renderDiffs(disputeMap.items)}
           ${renderFunnel(funnel)}
           ${renderModelProfiles(report.model_profiles)}

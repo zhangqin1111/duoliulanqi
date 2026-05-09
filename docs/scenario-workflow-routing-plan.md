@@ -538,6 +538,14 @@ ai_generated_trace
 - 「A 和 B 哪个好」识别为 `competitor_analysis`
 - 路由失败时回退 `general_compare`
 
+当前落地状态：
+
+- 已新增 `src/electron/renderer/task-router.js`，先用轻量规则识别 `public_opinion`、`fact_check`、`competitor_analysis`、`investment_research`、`legal_risk`、`general_compare`。
+- 已在发送/对比入口的补全前执行路由，并在聊天流程中展示「正在识别问题类型」。
+- 已把 `taskRoute` 写入去伪存真 session，并传入最终报告 Prompt。
+- 已把 `task_type`、`task_label`、`workflow`、`template` 写入结构化报告 `meta`，为后续模板注册表做准备。
+- 本阶段仍复用现有通用去伪链路；场景化 Prompt、独立 workflow、独立 PDF 模板留到里程碑 2-4。
+
 ### 里程碑 2: 舆情链路独立化
 
 目标：
@@ -557,6 +565,16 @@ ai_generated_trace
 - 舆情问题报告第一屏直接回答「有没有形成舆情事件」
 - 报告包含舆论温度、负面密度、是否需要回应
 
+当前落地状态：
+
+- 已新增 `src/electron/renderer/workflow-registry.js`，用于按 `task_type` 解析 workflow。
+- 已新增 `src/electron/renderer/workflows/public-opinion-workflow.js`，作为第一个场景化 workflow。
+- 舆情问题的补全 Prompt 已切到「舆情裁决任务书」，重点采集真实舆情事件、舆论温度、情绪/阵营结构、主要叙事、污染风险和核验问题。
+- 舆情问题的差异抽取 Prompt 已切到「舆情差异侦查」，重点识别旧闻当新、网友观点当事实、传播规模不足、主体混淆、时间漂移、信源缺失等差异。
+- 舆情问题的追问 Prompt 已切到「为什么舆情判断不一致」，重点追问时间边界、传播规模、观点/事实混淆、粉丝/黑粉情绪污染和 AI 幻觉。
+- 舆情问题的污染剔除 Prompt 已切到舆情污染枚举，包括旧闻当新、网友评论当事实、情绪放大、单一信源循环、传播规模夸大等。
+- 最终报告 Prompt 已读取 workflow 附加规则，要求第一屏回答是否形成真实舆情事件、舆论温度、风险等级、是否需要回应和下一步核验动作。
+
 ### 里程碑 3: 内容真假核验链路
 
 目标：
@@ -575,6 +593,85 @@ ai_generated_trace
 - 输入爆料类问题后，报告能拆出多个事实主张
 - 每条主张有可信/待核验/不可信状态
 
+当前落地状态：
+
+- 已新增 `src/electron/renderer/workflows/fact-check-workflow.js`，作为第二个场景化 workflow。
+- 真假核验问题的补全 Prompt 已切到「事实核验素材采集任务」，重点拆解 claim、证据强度、反证线索、可信倾向和核验动作。
+- 真假核验问题的差异抽取 Prompt 已切到「主张差异侦查」，重点识别主张拆解差异、信源等级差异、反证遗漏、旧闻翻炒、张冠李戴和无证据推测。
+- 真假核验问题的追问 Prompt 已切到「为什么真假判断不一致」，重点追问原始 claim、信源等级、一手来源、上下文缺失和二手转述污染。
+- 真假核验问题的污染剔除 Prompt 已切到真假核验污染枚举，包括无原始信源、二手转述循环、旧闻翻炒、主体混淆、断章取义和模型幻觉补全等。
+- 最终报告 Prompt 已读取真假核验场景规则，要求第一屏直接回答可信/不可信/证据不足、可信度、核心依据、最大不确定性和下一步核验动作。
+
+### 里程碑 3.5: 竞品对比链路
+
+目标：
+
+覆盖客户常见的产品/模型/方案选型问题，形成第三个场景化 workflow。
+
+当前落地状态：
+
+- 已新增 `src/electron/renderer/workflows/competitor-workflow.js`，作为第三个场景化 workflow。
+- 竞品问题的补全 Prompt 已切到「竞品选型与差异分析任务」，重点明确对比对象、对比维度、适用场景、优势短板、风险不确定性和最终选型建议。
+- 竞品问题的差异抽取 Prompt 已切到「选型差异侦查」，重点识别对象范围、功能、价格、定位、场景、证据和选型建议差异。
+- 竞品问题的追问 Prompt 已切到「为什么竞品判断不一致」，重点追问版本范围、评价维度、权重、场景假设、过时信息和营销话术污染。
+- 竞品问题的污染剔除 Prompt 已切到竞品污染枚举，包括营销话术、过时版本、无来源价格、主观体验当事实、单一用户样本放大、品牌偏见等。
+- 最终报告 Prompt 已读取竞品对比场景规则，要求第一屏回答推荐选择、适用场景、关键差异、最大风险和下一步核验动作。
+
+### 里程碑 3.6: 投研 / 政策影响链路
+
+目标：
+
+覆盖政策、行业、公司事件、市场变化等高价值研判问题，但输出形态限定为「影响路径与风险研判」，不做投资建议。
+
+当前落地状态：
+
+- 已新增 `src/electron/renderer/workflows/investment-workflow.js`，作为第四个场景化 workflow。
+- 投研/政策问题的补全 Prompt 已切到「影响路径与风险研判任务」，重点识别事件事实坐标、影响主体、影响路径、受益/受损环节、关键不确定性和后续观察指标。
+- 投研/政策问题的差异抽取 Prompt 已切到「影响研判差异侦查」，重点识别事实坐标、政策范围、产业链传导、受益受损主体、时间窗口和证据差异。
+- 投研/政策问题的追问 Prompt 已切到「为什么影响判断不一致」，重点追问政策范围、传导条件、相关性/因果混淆、过时数据和情绪污染。
+- 投研/政策问题的污染剔除 Prompt 已切到投研污染枚举，包括买卖建议伪装、收益承诺、相关性当因果、政策误读、过时数据、产业链传导跳步等。
+- 最终报告 Prompt 已读取投研场景规则，要求第一屏回答影响方向、影响路径、受益/受损主体、风险等级、关键不确定性和后续观察指标，同时禁止输出股票买卖建议或确定性投资结论。
+
+### 里程碑 3.7: 法律 / 合规初筛链路
+
+目标：
+
+覆盖合同、条款、宣传、业务行为、平台规则等高风险问题，但输出形态限定为「法律/合规风险初筛」，不替代律师或合规人员复核。
+
+当前落地状态：
+
+- 已新增 `src/electron/renderer/workflows/legal-risk-workflow.js`，作为第五个场景化 workflow。
+- 法律/合规问题的补全 Prompt 已切到「法律合规风险初筛任务」，重点识别风险点、涉及主体、规则方向、成立条件、证据缺口和专业复核问题。
+- 法律/合规问题的差异抽取 Prompt 已切到「风险差异侦查」，重点识别风险点、适用规则、成立条件、例外抗辩、证据缺口和风险等级差异。
+- 法律/合规问题的追问 Prompt 已切到「为什么风险判断不一致」，重点追问事实前提、管辖地/规则范围、条款上下文、证据条件、例外/抗辩和模型过度确定。
+- 法律/合规问题的污染剔除 Prompt 已切到合规污染枚举，包括正式法律意见伪装、过度确定结论、缺少管辖地、缺少合同全文、事实假设当事实等。
+- 最终报告 Prompt 已读取法律/合规场景规则，要求第一屏回答初筛风险等级、核心风险点、成立条件、证据缺口、建议动作和必须专业复核的问题，同时禁止输出正式法律意见。
+
+### 里程碑 3.8: 场景裁决块
+
+目标：
+
+让所有业务报告都不止有通用事实地图，还必须带一个可拍板的场景裁决层。
+
+当前落地状态：
+
+- 结构化 JSON 已新增 `scenario_decision` 顶层字段。
+- `scenario_decision` 包含 `task_type`、`task_label`、`decision_object`、`direct_verdict`、`recommended_action`、`evidence_standard`、`do_not_overread`、`decision_factors`、`next_questions`。
+- PDF 模板已新增「Scenario Decision Layer」模块，展示场景裁决、建议动作、采信标准、关键因素评分、不可误读项和下一步问题。
+
+### 里程碑 3.9: 场景化 PDF Profile
+
+目标：
+
+让不同业务问题生成的报告不再只是同一套文案换数据，而是拥有不同的裁决语言、看板标题、流程标签和决策提示。
+
+当前落地状态：
+
+- 已新增 `src/electron/report/scenario-report-profiles.js`，集中维护场景化报告文案配置。
+- 已为 `public_opinion`、`fact_check`、`competitor_analysis`、`investment_research`、`legal_risk`、`general_compare` 配置独立 profile。
+- PDF 封面徽标、流程管线、执行看板、用户问题裁决标题、图表标题、决策说明卡片、简报三步法已按 `task_type` 切换。
+- 后续新增业务场景时，优先新增 workflow + profile，不直接改 `fact-template.js`。
+
 ### 里程碑 4: 模板注册表
 
 目标：
@@ -592,6 +689,12 @@ ai_generated_trace
 
 - 不同 `task_type` 能生成不同页面结构
 - 默认报告名仍为 `滤镜·多源大模型内容对比分析`
+
+当前落地状态：
+
+- 已新增 `src/electron/report/report-template-registry.js`，主进程导出 PDF 时不再直接在 `main.js` 判断模板。
+- 当前五类场景先统一走增强版 Fact Black Box 模板，模板通过 `scenario_decision` 展示场景化裁决层。
+- 后续新增独立模板时，只需要在 registry 中按 `task_type` 注册，不需要继续改 `main.js` 或堆大模板。
 
 ### 里程碑 5: 外部信源核验
 
@@ -667,3 +770,76 @@ flowchart TD
 - `truth-seeking.js` 只保留编排职责。
 - 新场景通过注册表接入，而不是修改核心流程大文件。
 
+## Milestone 4.1: Fact report template decomposition
+
+Goal:
+Keep `fact-template.js` as the report composition layer only. Page sections and style ownership must live in modules named by product concept, not in one oversized template file.
+
+Implemented:
+
+- `src/electron/report/fact-cover-section.js`: cover page, headline decision, pipeline strip.
+- `src/electron/report/fact-decision-section.js`: scenario decision layer.
+- `src/electron/report/fact-issue-section.js`: user issue decision and scenario-specific analysis board.
+- `src/electron/report/fact-evidence-section.js`: fact rows, weighted timeline, evidence funnel, dispute table, model profiles.
+- `src/electron/report/fact-audit-section.js`: compressed audit appendix for model witness summaries.
+- `src/electron/report/fact-template-styles.js`: printable report stylesheet.
+- `src/electron/report/fact-template-utils.js`: shared HTML escaping, text normalization, scores, tags, verdict splitting.
+
+Boundary rule:
+
+- Do not add new page rendering functions directly to `fact-template.js`.
+- Do not place CSS back into `fact-template.js`.
+- New report pages should be added as `fact-*-section.js` modules and imported by the composition layer.
+
+## Milestone 4.2: Main process IPC decomposition
+
+Goal:
+Keep `src/electron/main.js` focused on window and BrowserView lifecycle. License, API, PDF export, and renderer-facing IPC handlers should live behind narrow registration modules.
+
+Implemented:
+
+- `src/electron/ipc/license-ipc.js`: license activation/state and platform list IPC.
+- `src/electron/ipc/dashscope-ipc.js`: DashScope key settings, normal completion, and streaming completion IPC.
+- `src/electron/ipc/pdf-export-ipc.js`: PDF export dialog, structured JSON extraction, HTML render, and `printToPDF`.
+- `src/electron/ipc/window-ipc.js`: embed host, popout/redock, bounds, dock overlay, guest exec, and reload IPC.
+- `src/electron/main.js` now registers those modules instead of owning all IPC handlers inline.
+
+## Milestone 4.3: Legacy report template removal
+
+Goal:
+Stop routing current exports through the old pre-structured template and remove the rollback-only renderer from the runtime package.
+
+Implemented:
+
+- `src/electron/report/report-template-registry.js` now defaults to the new Fact template even when structured JSON is missing.
+- `src/electron/report/template.js` / `legacy-template.js` has been removed from the active codebase; all report exports now go through the Fact template family.
+
+## Milestone 4.4: DashScope timeout and retry hardening
+
+Goal:
+Avoid interrupting the truth-seeking loop when final report generation or JSON extraction temporarily hits DashScope latency.
+
+Implemented:
+
+- `src/electron/dashscope-qwen.js` now supports configurable `timeoutMs` and `retries` for both normal and streaming completion.
+- Normal completion defaults to 90s with one retry; structured JSON calls request 120s with one retry.
+- Final streaming report generation requests 240s with one retry.
+- Retry is limited to transient timeout, network, 429, and 5xx errors.
+
+## Milestone 4.5: BrowserView and dock overlay extraction
+
+Goal:
+Make `src/electron/main.js` a thin application bootstrap instead of the owner of embedded browser lifecycle and floating-tool UI.
+
+Implemented:
+
+- `src/electron/browser-view-manager.js`: owns embedded AI BrowserView creation, user agent normalization, popout/redock, bounds syncing, guest script execution, reload, and cleanup.
+- `src/electron/dock-overlay-window.js`: owns the floating add/restore/refresh tool window, its HTML shell, positioning, state updates, and teardown.
+- `src/electron/ipc/window-ipc.js` now talks to `browserViewManager` and `dockOverlayWindow` instead of receiving internal maps from `main.js`.
+- `src/electron/main.js` now only creates the main window, wires lifecycle hooks, registers IPC modules, and passes app-level dependencies.
+
+Boundary rule:
+
+- Do not add BrowserView lifecycle code back to `main.js`.
+- Do not add dock overlay HTML back to `main.js`.
+- Window-related renderer IPC should go through `window-ipc.js` and delegate to a manager/controller.

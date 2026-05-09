@@ -25,6 +25,19 @@
           }
           const result = await api.exportPdf(payload);
           if (result && result.ok) {
+            if (api && typeof api.addReportHistory === 'function') {
+              api.addReportHistory({
+                question: payload.question || '',
+                taskType:
+                  (payload.structuredReport && payload.structuredReport.meta && payload.structuredReport.meta.task_type) ||
+                  (payload.taskRoute && payload.taskRoute.task_type) ||
+                  'general_compare',
+                models: (payload.rawReplies || []).map((reply) => reply.name || reply.model).filter(Boolean),
+                reportPath: result.filePath,
+                structuredPath: result.structuredPath || '',
+                status: 'exported',
+              }).catch(() => null);
+            }
             btn.textContent = '✓ 已保存';
           } else if (result && result.error === 'canceled') {
             btn.textContent = '导出情报报告';

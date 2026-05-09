@@ -4,8 +4,17 @@
   const MAX_LENGTH_FOR_REFINE = 1200;
   const DATE_HINT_RE = /(\d{4}[-/.年]\d{1,2}([-/月.]\d{1,2}日?)?|\d{1,2}月\d{1,2}日|昨天|今天|明天|上周|本周|下周|去年|今年|明年|近\d+[天周月年]|最近\d+[天周月年])/;
 
-  function buildRefinePrompt(rawQuestion) {
+  function resolveWorkflow(taskRoute) {
+    const registry = global.DuoliWorkflowRegistry;
+    return registry && typeof registry.resolve === 'function' ? registry.resolve(taskRoute) : null;
+  }
+
+  function buildRefinePrompt(rawQuestion, taskRoute) {
     const hasDateHint = DATE_HINT_RE.test(String(rawQuestion || ''));
+    const workflow = resolveWorkflow(taskRoute);
+    if (workflow && typeof workflow.buildRefinePrompt === 'function') {
+      return workflow.buildRefinePrompt(rawQuestion, { hasDateHint, taskRoute });
+    }
     return [
       '你是“滤镜工作台”的问题补全器。你的任务是把用户一句话问题补全成一条可以直接分发给多个 AI 窗口作答的高质量任务。',
       '',
@@ -66,7 +75,7 @@
     const getApi = () => (typeof deps.getApi === 'function' ? deps.getApi() : null);
     const timeoutMs = Number(deps.timeoutMs) > 0 ? Number(deps.timeoutMs) : DEFAULT_TIMEOUT_MS;
 
-    async function refineQuestion(rawQuestion) {
+    async function refineQuestion(rawQuestion, opt) {
       const raw = String(rawQuestion || '').trim();
       if (shouldSkipRefine(raw)) {
         throw new Error('问题为空或过短，无法进入补全流程。');
@@ -76,7 +85,7 @@
         throw new Error('千问补全接口不可用，无法进入多模型分发。');
       }
 
-      const result = await withTimeout(api.qwenComplete(buildRefinePrompt(raw)), timeoutMs);
+      const result = await withTimeout(api.qwenComplete(buildRefinePrompt(raw, opt && opt.taskRoute)), timeoutMs);
       if (!result || !result.ok || !result.text) {
         throw new Error((result && result.error) || '千问没有返回有效的补全问题。');
       }

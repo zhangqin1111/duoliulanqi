@@ -34,6 +34,9 @@
       } else {
         lines.push(`原始问题：${session.question}`);
       }
+      if (session.taskRoute && session.taskRoute.label) {
+        lines.push(`任务类型：${session.taskRoute.label}（置信度 ${Math.round((session.taskRoute.confidence || 0) * 100)}%）`);
+      }
       lines.push('', `当前阶段：${message}`, '');
       if (session.diffs && session.diffs.length) {
         lines.push('已识别差异');
@@ -138,7 +141,7 @@
     async function resolveDiffClosedLoop(session, diff) {
       const api = getApi();
       const followupRounds = [];
-      let currentPrompt = prompts().buildDiffFollowupQuestion(session.question, diff, 1);
+      let currentPrompt = prompts().buildDiffFollowupQuestion(session.question, diff, 1, session.taskRoute);
       let merge = null;
       let round = 1;
       let stopReason = '';
@@ -175,7 +178,7 @@
           break;
         }
         const nextPrompt = String(merge.followup_question || '').trim();
-        currentPrompt = nextPrompt || prompts().buildDiffFollowupQuestion(session.question, diff, round + 1);
+        currentPrompt = nextPrompt || prompts().buildDiffFollowupQuestion(session.question, diff, round + 1, session.taskRoute);
         round += 1;
       }
       return { diff, followupRounds, merge, rounds: round, stopReason };
@@ -191,6 +194,17 @@
         id: `analysis_${Date.now()}`,
         question,
         originalQuestion,
+        taskRoute: (opt && opt.taskRoute) || null,
+        taskType: opt && opt.taskRoute ? opt.taskRoute.task_type : 'general_compare',
+        highRisk:
+          global.DuoliHighRiskClassifier && typeof global.DuoliHighRiskClassifier.classifyHighRisk === 'function'
+            ? global.DuoliHighRiskClassifier.classifyHighRisk(originalQuestion || question, opt && opt.taskRoute ? opt.taskRoute.task_type : '')
+            : null,
+        evidencePlan:
+          global.DuoliEvidenceQueryPlanner && typeof global.DuoliEvidenceQueryPlanner.createSearchQueryPlan === 'function'
+            ? global.DuoliEvidenceQueryPlanner.createSearchQueryPlan(originalQuestion || question, opt && opt.taskRoute ? opt.taskRoute.task_type : '')
+            : null,
+        evidencePack: null,
         createdAt: new Date().toISOString(),
         initialResults: modelReplies,
         diffs: [],
@@ -200,6 +214,33 @@
         finalText: '',
       };
       setSession(session);
+
+      if (
+        session.evidencePlan &&
+        Array.isArray(session.evidencePlan.queries) &&
+        session.evidencePlan.queries.length &&
+        api &&
+        typeof api.searchEvidence === 'function'
+      ) {
+        try {
+          const evidenceResult = await api.searchEvidence({
+            question: originalQuestion || question,
+            taskType: session.taskType,
+            queries: session.evidencePlan.queries,
+            limit: 3,
+          });
+          session.evidencePack =
+            evidenceResult && evidenceResult.ok && evidenceResult.result ? evidenceResult.result.pack : null;
+          setSession(session);
+        } catch (error) {
+          session.evidencePack = {
+            error: error && error.message ? error.message : String(error),
+            queries: session.evidencePlan.queries,
+            items: [],
+          };
+          setSession(session);
+        }
+      }
 
       if (!modelReplies.some((reply) => reply.ok && reply.text)) {
         throw new Error('没有可用于分析的模型回答。');
@@ -212,7 +253,7 @@
         deps.setFlowStage('extract', '正在抽取差异', '系统正在从多模型回答里识别事实、口径、因果和建议差异。', 'active');
       }
       renderAnalysisProgress(session, '正在抽取差异点');
-      const diffPayload = await core().qwenJson(api, prompts().buildDiffExtractPrompt(question, modelReplies), {
+      const diffPayload = await core().qwenJson(api, prompts().buildDiffExtractPrompt(question, modelReplies, session.taskRoute), {
         overview: '',
         diffs: [],
       });
@@ -253,7 +294,7 @@
         deps.setFlowStage('pollution', '正在剔除污染', '正在识别模板话术、过度推测、幻觉补全和口径漂移。', 'active');
       }
       renderAnalysisProgress(session, '正在剔除污染因素(千问初判)');
-      session.pollution = await core().qwenJson(api, prompts().buildPollutionPrompt(question, modelReplies, session.diffAnalyses), {
+      session.pollution = await core().qwenJson(api, prompts().buildPollutionPrompt(question, modelReplies, session.diffAnalyses, session.taskRoute), {
         pollution_removed: [],
         kept_claims: [],
         discarded_claims: [],
@@ -286,7 +327,11 @@
           session.diffAnalyses,
           session.pollution,
           session.originalQuestion,
-          session.selfCleansing
+          session.selfCleansing,
+          session.taskRoute,
+          session.highRisk,
+          session.evidencePlan,
+          session.evidencePack
         ),
         (delta) => {
           accumulated += delta;
@@ -295,7 +340,8 @@
             refreshComparePanel();
             summaryBodyEl.scrollTop = summaryBodyEl.scrollHeight;
           }
-        }
+        },
+        { timeoutMs: 240000, retries: 1 }
       );
       if (!r.ok) {
         throw new Error(r.error || '最终裁决生成失败。');

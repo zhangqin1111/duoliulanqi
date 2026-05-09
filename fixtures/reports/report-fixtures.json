@@ -1,0 +1,88 @@
+[
+  {
+    "id": "consumer-iphone",
+    "taskType": "consumer_purchase",
+    "question": "iphone17各个机型对比，哪个性价比最高",
+    "structured": {
+      "meta": { "task_type": "consumer_purchase", "question_original": "iphone17各个机型对比，哪个性价比最高", "models": ["Kimi", "Doubao", "Yuanbao"] },
+      "executive_conclusion": { "one_sentence": "如果预算敏感，标准版优先；如果重视影像与续航，再考虑 Pro Max。", "confidence_score": 72, "risk_level": "medium" },
+      "question_brief": { "original": "iphone17各个机型对比，哪个性价比最高", "refined": "围绕 iPhone 17 系列不同机型的价格、配置、影像、续航、重量和适用人群做消费选购裁决。" },
+      "scenario_decision": { "task_type": "consumer_purchase", "decision_object": "iPhone 17 系列", "direct_verdict": "大多数用户优先看标准版，专业影像用户再看 Pro/Pro Max。", "recommended_action": "等官方价格和首发评测确认后再下单。", "decision_factors": [{ "label": "价格", "score": 82 }, { "label": "影像", "score": 70 }, { "label": "续航", "score": 68 }] },
+      "user_issue_analysis": { "direct_answer": "性价比最高通常不是顶配，而是满足核心体验且价格最低的版本。", "key_findings": ["先看官方价格", "再看影像与续航差异", "不要把顶配等同于最值"] },
+      "evidence_funnel": { "raw_claims": 18, "final_evidence": 6 },
+      "dispute_map": { "items": [{ "title": "机型命名与售价是否确定", "type": "事实差异", "severity": "high", "retained_judgment": "以官方发布为准。" }] },
+      "final_actions": ["核对官方售价", "等待首批评测", "按预算选择版本"]
+    }
+  },
+  {
+    "id": "opinion-person",
+    "taskType": "public_opinion",
+    "question": "郭德纲最近舆论怎么样",
+    "structured": {
+      "meta": { "task_type": "public_opinion", "question_original": "郭德纲最近舆论怎么样", "models": ["Kimi", "Doubao", "Yuanbao"] },
+      "executive_conclusion": { "one_sentence": "当前更像历史争议延续讨论，尚不足以裁定为新的强舆情事件。", "confidence_score": 74, "risk_level": "medium" },
+      "question_brief": { "original": "郭德纲最近舆论怎么样", "refined": "判断是否存在新的可验证舆情事件、讨论热度、负面风险和下一步核验动作。" },
+      "scenario_decision": { "task_type": "public_opinion", "decision_object": "郭德纲近期舆论", "direct_verdict": "没有足够证据证明出现新的强舆情事件。", "recommended_action": "继续观察平台热度和权威来源。", "decision_factors": [{ "label": "事件闭环", "score": 58 }] },
+      "user_issue_analysis": { "direct_answer": "有讨论，但不等于已经形成舆情危机。", "public_opinion_temperature": 62, "sentiment_distribution": [{ "label": "中性围观", "value": 45 }, { "label": "负面调侃", "value": 35 }] },
+      "evidence_funnel": { "raw_claims": 23, "final_evidence": 5 },
+      "dispute_map": { "items": [{ "title": "是否为新事件", "type": "时间差异", "severity": "high", "retained_judgment": "暂按延续讨论处理。" }] },
+      "final_actions": ["核验热搜曲线", "查找高传播原帖", "区分粉圈与路人盘"]
+    }
+  },
+  {
+    "id": "technical-electron",
+    "taskType": "technical_diagnosis",
+    "question": "Electron 打包 spawn EPERM 怎么修",
+    "structured": {
+      "meta": { "task_type": "technical_diagnosis", "question_original": "Electron 打包 spawn EPERM 怎么修", "models": ["Kimi", "Doubao"] },
+      "executive_conclusion": { "one_sentence": "优先排查杀毒拦截、残留安装包占用和 NSIS 临时文件权限。", "confidence_score": 80, "risk_level": "low" },
+      "question_brief": { "original": "Electron 打包 spawn EPERM 怎么修", "refined": "定位 Electron Builder 在 Windows 下 spawn EPERM 的根因并给出修复顺序。" },
+      "scenario_decision": { "task_type": "technical_diagnosis", "decision_object": "Electron Builder 打包失败", "direct_verdict": "先清理 release 与临时目录，再关闭拦截重试便携版。", "recommended_action": "建立 prebuild clean 和 portable 优先交付。", "decision_factors": [{ "label": "权限", "score": 86 }] },
+      "evidence_funnel": { "raw_claims": 12, "final_evidence": 4 },
+      "dispute_map": { "items": [] },
+      "final_actions": ["清理 release", "关闭占用进程", "优先生成 portable"]
+    }
+  },
+  {
+    "id": "legal-contract",
+    "taskType": "legal_risk",
+    "question": "帮我分析这份合同有没有风险条款",
+    "structured": {
+      "meta": { "task_type": "legal_risk", "question_original": "帮我分析这份合同有没有风险条款", "models": ["Kimi", "Doubao"] },
+      "executive_conclusion": { "one_sentence": "当前只能做合同风险初筛，不能替代律师正式审查。", "confidence_score": 66, "risk_level": "high" },
+      "question_brief": { "original": "帮我分析这份合同有没有风险条款", "refined": "识别合同中的付款、违约、解除、知识产权和责任限制风险。" },
+      "scenario_decision": { "task_type": "legal_risk", "decision_object": "合同条款", "direct_verdict": "重点核验责任限制、单方解除和模糊验收条款。", "recommended_action": "交由律师复核关键条款。", "evidence_standard": "需要合同原文和专业法律意见。", "do_not_overread": ["不替代律师意见"], "decision_factors": [{ "label": "责任边界", "score": 78 }] },
+      "evidence_funnel": { "raw_claims": 10, "final_evidence": 3 },
+      "dispute_map": { "items": [] },
+      "final_actions": ["标注风险条款", "补充合同全文", "咨询律师"]
+    }
+  },
+  {
+    "id": "medical-health",
+    "taskType": "medical_health",
+    "question": "体检血压150/95严重吗",
+    "structured": {
+      "meta": { "task_type": "medical_health", "question_original": "体检血压150/95严重吗", "models": ["Kimi", "Doubao"] },
+      "executive_conclusion": { "one_sentence": "该数值提示需要重视和复测，但不能仅凭一次体检完成诊断。", "confidence_score": 64, "risk_level": "high" },
+      "question_brief": { "original": "体检血压150/95严重吗", "refined": "围绕血压数值、复测、危险信号和就医建议做健康风险初筛。" },
+      "scenario_decision": { "task_type": "medical_health", "decision_object": "血压150/95", "direct_verdict": "建议规范复测并咨询医生。", "recommended_action": "连续监测并带记录就医。", "evidence_standard": "需要多次测量、病史和医生判断。", "do_not_overread": ["不提供诊断", "不提供用药方案"], "decision_factors": [{ "label": "复测必要性", "score": 85 }] },
+      "evidence_funnel": { "raw_claims": 8, "final_evidence": 3 },
+      "dispute_map": { "items": [] },
+      "final_actions": ["规范复测", "记录症状", "咨询医生"]
+    }
+  },
+  {
+    "id": "finance-fund",
+    "taskType": "finance_planning",
+    "question": "现在买基金合适吗",
+    "structured": {
+      "meta": { "task_type": "finance_planning", "question_original": "现在买基金合适吗", "models": ["Kimi", "Doubao"] },
+      "executive_conclusion": { "one_sentence": "不能给出买入承诺，应先确认风险承受能力、期限和资产配置。", "confidence_score": 67, "risk_level": "high" },
+      "question_brief": { "original": "现在买基金合适吗", "refined": "基于风险偏好、期限、现金流和市场不确定性做金融规划初筛。" },
+      "scenario_decision": { "task_type": "finance_planning", "decision_object": "基金投资", "direct_verdict": "适不适合买取决于风险承受能力和投资期限。", "recommended_action": "先做资产配置和分批计划。", "evidence_standard": "需要个人财务状况和风险测评。", "do_not_overread": ["不承诺收益", "不构成投资建议"], "decision_factors": [{ "label": "风险偏好", "score": 80 }] },
+      "evidence_funnel": { "raw_claims": 9, "final_evidence": 3 },
+      "dispute_map": { "items": [] },
+      "final_actions": ["确认风险偏好", "分散配置", "避免一次性重仓"]
+    }
+  }
+]

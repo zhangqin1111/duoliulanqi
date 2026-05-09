@@ -1,0 +1,98 @@
+[
+  {
+    "id": "consumer-iphone-variants",
+    "question": "iphone17各个机型对比，哪个性价比最高",
+    "expectedTaskType": "consumer_purchase",
+    "note": "消费电子机型横向对比，不能误判为产品不存在或通用对比。"
+  },
+  {
+    "id": "consumer-phone-budget",
+    "question": "预算4000元买哪款手机更划算",
+    "expectedTaskType": "consumer_purchase",
+    "note": "明确购买决策和预算。"
+  },
+  {
+    "id": "public-opinion-person",
+    "question": "郭德纲最近舆论怎么样，有没有负面风险",
+    "expectedTaskType": "public_opinion",
+    "note": "人物舆情与风险研判。"
+  },
+  {
+    "id": "fact-check-news",
+    "question": "网传这个新闻是真的吗，帮我核验可信度",
+    "expectedTaskType": "fact_check",
+    "note": "事实核查问题。"
+  },
+  {
+    "id": "competitor-saas",
+    "question": "帮我对比两个SaaS系统的功能差异和竞品机会",
+    "expectedTaskType": "competitor_analysis",
+    "note": "企业产品竞品分析，不是消费购买。"
+  },
+  {
+    "id": "investment-policy",
+    "question": "这个政策对机器人产业链是利好还是利空",
+    "expectedTaskType": "investment_research",
+    "note": "政策影响与投研判断。"
+  },
+  {
+    "id": "knowledge-brief",
+    "question": "什么是RAG，为什么大模型需要它",
+    "expectedTaskType": "knowledge_brief",
+    "note": "知识解释和原理梳理。"
+  },
+  {
+    "id": "creative-xiaohongshu",
+    "question": "帮我写一组小红书种草文案和标题",
+    "expectedTaskType": "creative_content",
+    "note": "内容创作。"
+  },
+  {
+    "id": "technical-electron",
+    "question": "Electron 打包报错 spawn EPERM 怎么排查和修复",
+    "expectedTaskType": "technical_diagnosis",
+    "note": "技术诊断。"
+  },
+  {
+    "id": "learning-paper",
+    "question": "帮我做一篇论文综述，梳理研究脉络和争议",
+    "expectedTaskType": "learning_research",
+    "note": "学习研究。"
+  },
+  {
+    "id": "travel-shanghai",
+    "question": "上海周末两天怎么玩，帮我安排路线和餐厅",
+    "expectedTaskType": "travel_lifestyle",
+    "note": "旅行与本地生活。"
+  },
+  {
+    "id": "career-resume",
+    "question": "帮我优化简历并准备面试问题",
+    "expectedTaskType": "career_recruiting",
+    "note": "职业求职。"
+  },
+  {
+    "id": "legal-contract",
+    "question": "帮我分析这份合同有没有风险条款",
+    "expectedTaskType": "legal_risk",
+    "note": "法律合规初筛。"
+  },
+  {
+    "id": "medical-blood-pressure",
+    "question": "体检血压150/95严重吗，应该注意什么",
+    "expectedTaskType": "medical_health",
+    "note": "医疗健康高风险初筛。"
+  },
+  {
+    "id": "finance-fund",
+    "question": "现在买基金合适吗，怎么做资产配置",
+    "expectedTaskType": "finance_planning",
+    "note": "金融规划高风险初筛。"
+  },
+  {
+    "id": "general-open-ended",
+    "question": "帮我分析一下这个事情",
+    "expectedTaskType": "general_compare",
+    "note": "意图过宽，进入通用多源对比。"
+  }
+]

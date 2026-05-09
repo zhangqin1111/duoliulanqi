@@ -5,7 +5,16 @@
     return claims.map((claim) => `- ${claim.model || '未知模型'}：${claim.claim || ''}`).join('\n');
   }
 
-  function buildDiffExtractPrompt(question, modelReplies) {
+  function resolveWorkflow(taskRoute) {
+    const registry = global.DuoliWorkflowRegistry;
+    return registry && typeof registry.resolve === 'function' ? registry.resolve(taskRoute) : null;
+  }
+
+  function buildDiffExtractPrompt(question, modelReplies, taskRoute) {
+    const workflow = resolveWorkflow(taskRoute);
+    if (workflow && typeof workflow.buildDiffExtractPrompt === 'function') {
+      return workflow.buildDiffExtractPrompt({ question, modelReplies, taskRoute });
+    }
     return [
       '你是“去伪存真”分析流程里的差异抽取器。',
       '任务：只基于多个 AI 对同一问题的原始回答，抽取真正值得追问的差异点。',
@@ -41,7 +50,11 @@
     ].join('\n');
   }
 
-  function buildDiffFollowupQuestion(question, diff, round) {
+  function buildDiffFollowupQuestion(question, diff, round, taskRoute) {
+    const workflow = resolveWorkflow(taskRoute);
+    if (workflow && typeof workflow.buildDiffFollowupQuestion === 'function') {
+      return workflow.buildDiffFollowupQuestion({ question, diff, round, taskRoute });
+    }
     return [
       `原始问题：${question}`,
       '',
@@ -160,7 +173,11 @@
     ].join('\n');
   }
 
-  function buildPollutionPrompt(question, modelReplies, diffAnalyses) {
+  function buildPollutionPrompt(question, modelReplies, diffAnalyses, taskRoute) {
+    const workflow = resolveWorkflow(taskRoute);
+    if (workflow && typeof workflow.buildPollutionPrompt === 'function') {
+      return workflow.buildPollutionPrompt({ question, modelReplies, diffAnalyses, taskRoute });
+    }
     return [
       '你是“去伪存真”流程里的污染剔除器。',
       '任务：基于原始回答、差异追问和二次合并结果，识别并剔除污染因素。',
@@ -186,7 +203,7 @@
     ].join('\n');
   }
 
-  function buildFinalTracePrompt(question, modelReplies, diffAnalyses, pollution, originalQuestion, selfCleansing) {
+  function buildFinalTracePrompt(question, modelReplies, diffAnalyses, pollution, originalQuestion, selfCleansing, taskRoute, highRisk, evidencePlan, evidencePack) {
     const api = global.DuoliEvaluationReportPrompt;
     if (api && typeof api.buildEvaluationReportPrompt === 'function') {
       return api.buildEvaluationReportPrompt({
@@ -196,6 +213,10 @@
         diffAnalyses,
         pollution,
         selfCleansing,
+        taskRoute,
+        highRisk,
+        evidencePlan,
+        evidencePack,
       });
     }
     return [

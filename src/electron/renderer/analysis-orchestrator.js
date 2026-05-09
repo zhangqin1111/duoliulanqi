@@ -43,11 +43,20 @@
           deps.failFlowStage('report', `流程中断：${msg}`);
         }
         if (typeof deps.showCompareReadyCard === 'function') {
+          const recoveryActions =
+            global.DuoliRecoveryActions && typeof global.DuoliRecoveryActions.actionsForFailure === 'function'
+              ? global.DuoliRecoveryActions.actionsForFailure({
+                  failedStage: 'reporting',
+                  failedModels: [],
+                  hasCurrentMaterials: true,
+                })
+              : [];
           deps.showCompareReadyCard({
             title: '去伪存真闭环被中断',
             detail: `流程中的某个分析环节遇到问题：${msg}。你仍然可以打开当前材料，查看已完成的多模型回答、差异记录和已完成阶段。`,
             buttonText: '查看当前材料',
             tone: 'error',
+            actions: recoveryActions,
           });
         }
         deps.refreshComparePanel();

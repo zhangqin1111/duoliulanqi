@@ -183,6 +183,26 @@
     };
   }
 
+  function normalizeScenarioDecision(input, fallback) {
+    const source = input || {};
+    const route = (fallback && fallback.taskRoute) || {};
+    return {
+      task_type: safeText(source.task_type, fallback.taskType || route.task_type || 'general_compare'),
+      task_label: safeText(source.task_label, route.label || ''),
+      decision_object: safeText(source.decision_object || source.object, ''),
+      direct_verdict: safeText(source.direct_verdict || source.verdict, ''),
+      recommended_action: safeText(source.recommended_action || source.action, ''),
+      evidence_standard: safeText(source.evidence_standard || source.standard, ''),
+      do_not_overread: safeArray(source.do_not_overread || source.limits).map((v) => safeText(v)).filter(Boolean),
+      decision_factors: safeArray(source.decision_factors || source.factors).map((item, index) => ({
+        label: safeText(item && item.label, `因素${index + 1}`),
+        score: clampScore(item && item.score, 50),
+        note: safeText(item && item.note),
+      })),
+      next_questions: safeArray(source.next_questions || source.questions).map((v) => safeText(v)).filter(Boolean),
+    };
+  }
+
   function normalizeFactReport(raw, fallback) {
     if (!raw || typeof raw !== 'object') return null;
     const factMap = raw.fact_map || {};
@@ -195,6 +215,13 @@
         generated_at: safeText(raw.meta && raw.meta.generated_at, new Date().toISOString()),
         models: safeArray(raw.meta && raw.meta.models).map((v) => safeText(v)).filter(Boolean),
         workflow_rounds: Math.max(1, Math.round(Number(raw.meta && raw.meta.workflow_rounds) || 1)),
+        task_type: safeText(
+          raw.meta && raw.meta.task_type,
+          fallback.taskType || (fallback.taskRoute && fallback.taskRoute.task_type) || 'general_compare'
+        ),
+        task_label: safeText(raw.meta && raw.meta.task_label, fallback.taskRoute && fallback.taskRoute.label),
+        workflow: safeText(raw.meta && raw.meta.workflow, fallback.taskRoute && fallback.taskRoute.recommended_workflow),
+        template: safeText(raw.meta && raw.meta.template, fallback.taskRoute && fallback.taskRoute.recommended_template),
       },
       executive_conclusion: normalizeExecutiveConclusion(raw.executive_conclusion),
       user_issue_analysis: normalizeUserIssueAnalysis(raw.user_issue_analysis || raw.issue_analysis || raw.public_opinion_analysis),
@@ -218,6 +245,7 @@
         ).filter(Boolean),
         retained_judgment: safeText(sourceDiagnosis.retained_judgment || raw.final_judgment, ''),
       },
+      scenario_decision: normalizeScenarioDecision(raw.scenario_decision || raw.decision_brief, fallback || {}),
       final_actions: safeArray(raw.final_actions || raw.next_actions).map((v) => safeText(v)).filter(Boolean),
       raw,
     };

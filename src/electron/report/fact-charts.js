@@ -96,10 +96,11 @@ function renderAxisMap(items) {
       ${list
         .map((item, idx) => {
           const x = clamp(item.heat, 8, 92);
-          const y = 100 - clamp(item.credibility, 8, 92);
+          const y = clamp(100 - clamp(item.credibility, 8, 92), 12, 72);
           const size = 11 + clamp(item.weight, 0, 100) / 7;
+          const labelSide = y > 58 ? 'top' : 'bottom';
           return `
-            <div class="axis-dot axis-dot--${idx % 5}" style="left:${x}%;top:${y}%;width:${size}px;height:${size}px">
+            <div class="axis-dot axis-dot--${idx % 5} axis-dot--label-${labelSide}" style="left:${x}%;top:${y}%;width:${size}px;height:${size}px">
               <span>${escapeXml(item.label || `阵营${idx + 1}`)}</span>
             </div>
           `;

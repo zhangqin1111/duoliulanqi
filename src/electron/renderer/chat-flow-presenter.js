@@ -136,6 +136,20 @@
         event.stopPropagation();
         if (typeof deps.openComparePanel === 'function') deps.openComparePanel();
       });
+      if (Array.isArray(data.actions) && data.actions.length) {
+        const actionsEl = card.querySelector('.result-card__actions');
+        data.actions.forEach((action) => {
+          const actionButton = document.createElement('button');
+          actionButton.type = 'button';
+          actionButton.className = 'ghost result-card__button';
+          actionButton.textContent = action.label || action.id || '执行';
+          actionButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (typeof deps.onRecoveryAction === 'function') deps.onRecoveryAction(action);
+          });
+          actionsEl.appendChild(actionButton);
+        });
+      }
       flowEl.appendChild(card);
       scrollToBottom();
     }

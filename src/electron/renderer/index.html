@@ -96,6 +96,33 @@
                 <button type="button" id="settings-clear" class="ghost">清除本地文件</button>
               </div>
               <p id="settings-msg" class="settings-msg" role="status"></p>
+              <section class="settings-history" aria-labelledby="settings-history-title">
+                <div class="settings-history__head">
+                  <div>
+                    <h3 id="settings-history-title">报告历史</h3>
+                    <p>最近导出的 PDF 会记录在本机，便于客户演示、复盘和定位问题。</p>
+                  </div>
+                  <button type="button" id="settings-history-refresh" class="ghost">刷新</button>
+                </div>
+                <div id="settings-history-list" class="settings-history__list" aria-live="polite">
+                  暂无历史
+                </div>
+              </section>
+              <section class="settings-history" aria-labelledby="settings-provider-title">
+                <div class="settings-history__head">
+                  <div>
+                    <h3 id="settings-provider-title">模型底座与配置</h3>
+                    <p>展示当前可调用的 API 模型、密钥来源和远程配置状态。</p>
+                  </div>
+                  <div class="settings-history__actions">
+                    <button type="button" id="settings-diagnostic-export" class="ghost">导出诊断包</button>
+                    <button type="button" id="settings-provider-refresh" class="ghost">检测</button>
+                  </div>
+                </div>
+                <div id="settings-provider-list" class="settings-history__list" aria-live="polite">
+                  尚未检测
+                </div>
+              </section>
             </div>
 
             <section class="thread-surface">
@@ -206,6 +233,15 @@
     </main>
 
     <script src="controller-registry.js"></script>
+    <script src="task-router.js"></script>
+    <script src="workflows/public-opinion-workflow.js"></script>
+    <script src="workflows/fact-check-workflow.js"></script>
+    <script src="workflows/competitor-workflow.js"></script>
+    <script src="workflows/consumer-purchase-workflow.js"></script>
+    <script src="workflows/investment-workflow.js"></script>
+    <script src="workflows/legal-risk-workflow.js"></script>
+    <script src="workflows/adaptive-workflows.js"></script>
+    <script src="workflow-registry.js"></script>
     <script src="evaluation-report-prompt.js"></script>
     <script src="report-schema.js"></script>
     <script src="reporting.js"></script>
@@ -221,6 +257,11 @@
     <script src="reply-quality.js"></script>
     <script src="user-preferences.js"></script>
     <script src="ai-conversation.js"></script>
+    <script src="analysis-state-machine.js"></script>
+    <script src="model-run-state.js"></script>
+    <script src="recovery-actions.js"></script>
+    <script src="high-risk-classifier.js"></script>
+    <script src="evidence-query-planner.js"></script>
     <script src="chat-flow-presenter.js"></script>
     <script src="composer-presenter.js"></script>
     <script src="status-presenter.js"></script>
