@@ -1,5 +1,7 @@
 'use strict';
 
+const { UNIVERSAL_KEYS } = require('../shared/scenario-action-contracts');
+
 const TASK_CONTRACTS = {
   public_opinion: {
     payload: ['signal_matrix', 'verified_events', 'actor_map', 'risk_triggers'],
@@ -121,6 +123,9 @@ function validateScenarioContract(report) {
   for (const key of contract.payload) {
     if (isEmptyValue(payload[key])) warnings.push(`scenario_payload.${key}_missing`);
   }
+  for (const key of UNIVERSAL_KEYS) {
+    if (isEmptyValue(payload[key])) warnings.push(`scenario_payload.${key}_missing`);
+  }
 
   for (const key of contract.decision) {
     if (isEmptyValue(decision[key])) warnings.push(`scenario_decision.${key}_missing`);
@@ -131,6 +136,8 @@ function validateScenarioContract(report) {
     if (candidateTable.length < 3) errors.push('consumer_purchase.candidate_table_requires_at_least_3_items');
     if (isEmptyValue(payload.recommendations)) errors.push('consumer_purchase.recommendations_missing');
     if (isEmptyValue(payload.value_weights)) warnings.push('consumer_purchase.value_weights_missing');
+    if (isEmptyValue(payload.price_ladder)) warnings.push('consumer_purchase.price_ladder_missing');
+    if (isEmptyValue(payload.offer_strategy)) warnings.push('consumer_purchase.offer_strategy_missing');
   }
 
   if (taskType === 'general_compare') {

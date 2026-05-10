@@ -16,6 +16,7 @@
     finance_planning: ['asset_snapshot', 'risk_profile', 'allocation_options', 'action_plan'],
     general_compare: ['comparison_table', 'decision_matrix', 'risk_notes'],
   };
+  const ACTION_PAYLOAD_KEYS = ['action_brief', 'decision_ladder', 'action_rules', 'red_flags', 'verification_checklist'];
 
   function taskTypeOf(report, session) {
     return String(
@@ -43,9 +44,11 @@
   function auditStructuredReport(report, session) {
     const taskType = taskTypeOf(report, session);
     const payload = (report && report.scenario_payload) || {};
-    const missingPayloadKeys = (REQUIRED_PAYLOAD_KEYS[taskType] || REQUIRED_PAYLOAD_KEYS.general_compare).filter((key) =>
-      isEmpty(payload[key])
-    );
+    const missingPayloadKeys = [
+      ...(REQUIRED_PAYLOAD_KEYS[taskType] || REQUIRED_PAYLOAD_KEYS.general_compare),
+      ...ACTION_PAYLOAD_KEYS,
+      ...(taskType === 'consumer_purchase' ? ['price_ladder', 'offer_strategy'] : []),
+    ].filter((key) => isEmpty(payload[key]));
     const missingTopLevel = [
       'meta',
       'executive_conclusion',
@@ -81,6 +84,13 @@
   }
 
   function buildCompletionPrompt({ session, finalText, report, audit }) {
+    const actionContracts =
+      root.DuoliScenarioActionContracts ||
+      (typeof require === 'function' ? require('../shared/scenario-action-contracts') : null);
+    const actionContractAddon =
+      actionContracts && typeof actionContracts.buildActionPromptAddon === 'function'
+        ? actionContracts.buildActionPromptAddon(audit.taskType || 'general_compare')
+        : '';
     return [
       '你是“滤镜·多源大模型内容对比分析”的报告质量总审稿人。',
       '当前最终报告的结构化 JSON 不完整。你的任务不是降级，不是解释失败，而是基于已有材料补齐一份可直接渲染、可用于决策的完整 JSON。',
@@ -91,6 +101,7 @@
       '3. 没有证据的事实字段可以写“待核验”，但必须补齐对应结构、核验口径、人工核验项和下一步动作。',
       '4. direct_answer / direct_verdict 必须直接回答用户真正想解决的问题。',
       '5. scenario_payload 必须完整；缺失字段必须全部补齐。',
+      actionContractAddon ? `6. 场景可执行答案硬约束：${actionContractAddon}` : '',
       '',
       `任务类型：${audit.taskType}`,
       `用户原始问题：${(session && (session.originalQuestion || session.question)) || ''}`,
@@ -173,6 +184,16 @@
       }
       completed = repair.completeMissingFieldsDeterministically(completed || {}, session, completedAudit);
       completedBy = 'deterministic_final_repair';
+      completedAudit = auditStructuredReport(completed, session);
+    }
+    const actionContracts =
+      root.DuoliScenarioActionContracts ||
+      (typeof require === 'function' ? require('../shared/scenario-action-contracts') : null);
+    if (actionContracts && typeof actionContracts.ensureActionablePayload === 'function') {
+      actionContracts.ensureActionablePayload(completed, {
+        taskType: completedAudit.taskType,
+        question: session && (session.originalQuestion || session.question),
+      });
       completedAudit = auditStructuredReport(completed, session);
     }
     return {

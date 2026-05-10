@@ -1,6 +1,7 @@
 'use strict';
 
 const { hasPlaceholder, taskTypeOf, validateScenarioContract } = require('./scenario-contracts');
+const { ensureActionablePayload } = require('../shared/scenario-action-contracts');
 
 const STRONG_STATUS = new Set(['strong', 'confirmed', 'high']);
 const MISLEADING_VERIFIED_RE =
@@ -368,6 +369,10 @@ function applyReportQualityGate(report) {
     taskType: taskTypeOf(data),
     question: text(data.meta && data.meta.question_original),
   });
+  ensureActionablePayload(cleaned, {
+    taskType: taskTypeOf(cleaned),
+    question: userQuestionText(cleaned),
+  });
   const validation = validateScenarioContract(cleaned);
   const summary = evidenceSummary(cleaned);
   const evidenceMissing = summary.evidence_sources === 0 || (summary.claims > 0 && summary.bound === 0);
@@ -392,6 +397,10 @@ function applyReportQualityGate(report) {
     };
   }
 
+  ensureActionablePayload(cleaned, {
+    taskType: taskTypeOf(cleaned),
+    question: userQuestionText(cleaned),
+  });
   return cleaned;
 }
 

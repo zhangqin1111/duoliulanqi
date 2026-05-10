@@ -49,6 +49,11 @@
       workflowRegistry && typeof workflowRegistry.resolve === 'function' ? workflowRegistry.resolve(taskRoute) : null;
     const workflowReportAddon =
       workflow && typeof workflow.buildReportPromptAddon === 'function' ? workflow.buildReportPromptAddon({ taskRoute }) : '';
+    const actionContracts = global.DuoliScenarioActionContracts;
+    const actionContractAddon =
+      actionContracts && typeof actionContracts.buildActionPromptAddon === 'function'
+        ? actionContracts.buildActionPromptAddon(taskRoute.task_type || 'general_compare')
+        : '';
 
     const lines = [
       '# 角色与任务',
@@ -74,6 +79,7 @@
       '11. dispute_map.items 每项必须能被压缩成三行：问题、裁决、原因；retained_judgment 写“裁决”，why_it_matters 写“原因”，避免论文式长段落。',
       `12. 系统已识别任务类型为“${taskLabel}”，推荐工作流为“${taskWorkflow}”，推荐报告模板为“${taskTemplate}”。报告结构必须优先服务这个场景。`,
       workflowReportAddon ? `13. 场景化报告规则：${workflowReportAddon}` : '',
+      actionContractAddon ? `13.1 场景可执行答案硬约束：${actionContractAddon}` : '',
     ];
     if (wasRefined) {
       lines.push(
@@ -102,6 +108,7 @@
       'JSON 顶层字段必须包含：meta、executive_conclusion、scenario_decision、scenario_payload、question_brief、user_issue_analysis、fact_map、dispute_map、evidence_funnel、model_profiles、source_diagnosis、final_actions。',
       '其中 user_issue_analysis 为核心字段，必须用于直接回答用户问题；如果用户问舆论，就输出舆情温度、情绪结构、阵营/群体、主要叙事、风险矩阵；如果用户问消费选购，就把 sentiment_distribution 写成价值构成，把 stance_distribution 写成推荐梯队，把 audience_segments 写成购买人群坐标，把 risk_matrix 写成购买风险矩阵；如果不是舆论题，也要转写为该问题的结果研判、关键发现、风险矩阵。',
       'scenario_payload 必须按 task_type 填充可渲染数据：consumer_purchase 必须给候选产品表、价值权重、人群排序、首选/备选/不推荐、人工核验项；public_opinion 必须给舆论信号、已验证事件、主体/群体和风险触发器；technical_diagnosis 必须给症状、根因假设、修复方案和验证步骤。不要用空泛段落替代结构化表格。',
+      'scenario_payload 还必须包含 action_brief、decision_ladder、action_rules、red_flags、verification_checklist。消费/价格评估还必须包含 price_ladder、offer_strategy，用来回答合理价、偏贵线、低价风险线、砍价目标和放弃条件。',
       '不要输出旧版模型评测字段，不要输出 scoreboard/core_tension/selection_quadrant/info_funnel/alignment_tax/fact_sankey。报告数据以事实黑匣子新结构为准。',
       '',
       'JSON schema：',

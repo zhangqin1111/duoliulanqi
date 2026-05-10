@@ -95,10 +95,88 @@ function renderScenarioList(title, badge, items, fallback) {
             </section>`;
 }
 
+function normalizeActionItem(item, fallbackTitle) {
+  if (typeof item === 'string') return { title: item, body: '' };
+  return {
+    title: text(
+      item &&
+        (item.step ||
+          item.rule ||
+          item.flag ||
+          item.item ||
+          item.title ||
+          item.label ||
+          item.name ||
+          item.conclusion),
+      fallbackTitle || '待核验动作'
+    ),
+    body: text(
+      item &&
+        (item.action ||
+          item.mitigation ||
+          item.status ||
+          item.note ||
+          item.body ||
+          item.description ||
+          item.reason ||
+          item.conclusion),
+      ''
+    ),
+  };
+}
+
+function renderScenarioActionPanel(report) {
+  const payload = (report && report.scenario_payload) || {};
+  const brief = payload.action_brief || {};
+  const ladder = array(payload.decision_ladder).map((item) => normalizeActionItem(item, '决策点')).slice(0, 4);
+  const checklist = array(payload.verification_checklist).map((item) => normalizeActionItem(item, '核验项')).slice(0, 6);
+  const redFlags = array(payload.red_flags).map((item) => normalizeActionItem(item, '风险点')).slice(0, 4);
+  return `
+            <section class="card card--wide scenario-action-panel">
+              <header class="card-head"><span>可执行答案</span><b>Action Contract</b></header>
+              <div class="scenario-action-hero">
+                <article>
+                  <span>用户现在最该看</span>
+                  <strong>${escapeHtml(clipText(brief.decision || brief.answer || '等待可执行裁决', 120))}</strong>
+                  <p>${escapeHtml(clipText(brief.recommended_next_step || brief.user_value || '', 160))}</p>
+                </article>
+                <article>
+                  <span>可信依据</span>
+                  <strong>${escapeHtml(clipText(brief.confidence_basis || '多模型交叉分析 + 待核验清单', 96))}</strong>
+                  <p>${escapeHtml(clipText(brief.user_value || '', 140))}</p>
+                </article>
+              </div>
+              <div class="scenario-action-grid">
+                <div>
+                  <b>决策阶梯</b>
+                  ${ladder
+                    .map(
+                      (item, index) => `
+                        <p><strong>${String(index + 1).padStart(2, '0')} ${escapeHtml(clipText(item.title, 34))}</strong>${escapeHtml(clipText(item.body, 86))}</p>`
+                    )
+                    .join('')}
+                </div>
+                <div>
+                  <b>必须核验</b>
+                  ${checklist
+                    .map((item) => `<p><strong>${escapeHtml(clipText(item.title, 34))}</strong>${escapeHtml(clipText(item.body, 70) || '待核验')}</p>`)
+                    .join('')}
+                </div>
+                <div>
+                  <b>避坑红线</b>
+                  ${redFlags
+                    .map((item) => `<p><strong>${escapeHtml(clipText(item.title, 34))}</strong>${escapeHtml(clipText(item.body, 70))}</p>`)
+                    .join('')}
+                </div>
+              </div>
+            </section>`;
+}
+
 module.exports = {
   appendUnique,
   ensureArray,
   injectBeforeEvidenceGrid,
+  renderScenarioActionPanel,
   renderScenarioCard,
   renderScenarioList,
   renderScenarioShell,

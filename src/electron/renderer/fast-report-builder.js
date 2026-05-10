@@ -93,7 +93,25 @@
         risk_notes: pollutionFactors(session),
       },
     };
-    return payloads[taskType] || payloads.general_compare;
+    const payload = payloads[taskType] || payloads.general_compare;
+    const actionContracts = global.DuoliScenarioActionContracts;
+    if (actionContracts && typeof actionContracts.ensureActionablePayload === 'function') {
+      const report = {
+        meta: { task_type: taskType },
+        scenario_payload: payload,
+        scenario_decision: {
+          task_type: taskType,
+          direct_verdict: pending,
+          recommended_action: pending,
+        },
+      };
+      actionContracts.ensureActionablePayload(report, {
+        taskType,
+        question: session && (session.originalQuestion || session.question),
+      });
+      return report.scenario_payload;
+    }
+    return payload;
   }
 
   function buildStructuredReport(session) {

@@ -215,6 +215,15 @@
     for (const key of REQUIRED_PAYLOAD_KEYS[taskType] || REQUIRED_PAYLOAD_KEYS.general_compare) {
       if (isEmpty(out.scenario_payload[key])) out.scenario_payload[key] = payloadItemForKey(key, session, taskType);
     }
+    const actionContracts =
+      root.DuoliScenarioActionContracts ||
+      (typeof require === 'function' ? require('../shared/scenario-action-contracts') : null);
+    if (actionContracts && typeof actionContracts.ensureActionablePayload === 'function') {
+      actionContracts.ensureActionablePayload(out, {
+        taskType,
+        question: session && (session.originalQuestion || session.question),
+      });
+    }
     return out;
   }
 

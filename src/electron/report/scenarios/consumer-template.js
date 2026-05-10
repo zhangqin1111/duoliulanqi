@@ -5,6 +5,7 @@ const { array, clipText, escapeHtml, text } = require('../fact-template-utils');
 const {
   appendUnique,
   injectBeforeEvidenceGrid,
+  renderScenarioActionPanel,
   renderScenarioCard,
   renderScenarioList,
   renderScenarioShell,
@@ -125,6 +126,41 @@ function renderConsumerRecommendationTable(report) {
             </section>`;
 }
 
+function renderConsumerPriceLadder(report) {
+  const payload = (report && report.scenario_payload) || {};
+  const rows = array(payload.price_ladder).slice(0, 8);
+  if (!rows.length) return '';
+  return `
+            <section class="card card--wide consumer-table-card">
+              <header class="card-head"><span>价格决策锚点</span><b>Price Ladder</b></header>
+              <table class="consumer-candidate-table consumer-price-table">
+                <thead>
+                  <tr>
+                    <th>对象</th>
+                    <th>合理价区间</th>
+                    <th>砍价目标</th>
+                    <th>偏贵 / 风险线</th>
+                    <th>核验口径</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows
+                    .map(
+                      (item) => `
+                        <tr>
+                          <td><strong>${displayValue(item.item || item.name || item.model)}</strong><small>${displayValue(item.mileage_band || item.condition, '版本/里程/车况待核验')}</small></td>
+                          <td>${displayValue(item.reasonable_range)}</td>
+                          <td>${displayValue(item.bargain_target)}</td>
+                          <td>${displayValue(item.overpriced_line)}<small>${displayValue(item.low_price_risk_line, '低价风险线待核验')}</small></td>
+                          <td><span class="verify-pill">${displayValue(item.verification_status, '待核验')}</span><small>${displayValue(item.note || item.source_note, '结合地区、车况、时间复核')}</small></td>
+                        </tr>`
+                    )
+                    .join('')}
+                </tbody>
+              </table>
+            </section>`;
+}
+
 function renderConsumerDecisionPage(report) {
   const decision = report.scenario_decision || {};
   const issue = report.user_issue_analysis || {};
@@ -151,6 +187,8 @@ function renderConsumerDecisionPage(report) {
         { title: '年轻首购', body: '优先终端价、智能座舱、主动安全和保养成本。' },
         { title: '长途/新能源', body: '单独核验补能、续航达成率、质保和交付周期。' },
       ])}
+      ${renderScenarioActionPanel(report)}
+      ${renderConsumerPriceLadder(report)}
       ${renderConsumerCandidateTable(report)}
       ${renderConsumerRecommendationTable(report)}
       ${renderScenarioCard(
@@ -172,5 +210,6 @@ module.exports = {
   buildConsumerReport,
   buildReportHtml,
   renderConsumerCandidateTable,
+  renderConsumerPriceLadder,
   renderConsumerRecommendationTable,
 };

@@ -7,6 +7,12 @@ function fail(message) {
   process.exitCode = 1;
 }
 
+function hasItems(value, min = 1) {
+  if (Array.isArray(value)) return value.length >= min;
+  if (value && typeof value === 'object') return Object.keys(value).length >= min;
+  return String(value || '').trim().length > 0;
+}
+
 function checkBlockedPublicOpinionStrongVerdict() {
   const gated = applyReportQualityGate({
     meta: {
@@ -159,6 +165,18 @@ function main() {
       }
       if (!Array.isArray(payload.manual_verification_items) || payload.manual_verification_items.length < 3) {
         problems.push('consumer manual verification list should be explicit');
+      }
+      if (!hasItems(payload.price_ladder)) {
+        problems.push('consumer price ladder should be explicit');
+      }
+      if (!hasItems(payload.offer_strategy)) {
+        problems.push('consumer offer strategy should be explicit');
+      }
+    }
+
+    for (const key of ['action_brief', 'decision_ladder', 'action_rules', 'red_flags', 'verification_checklist']) {
+      if (!hasItems((gated.scenario_payload || {})[key])) {
+        problems.push(`action contract missing: ${key}`);
       }
     }
 

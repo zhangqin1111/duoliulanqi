@@ -5,6 +5,7 @@ const { array, clipText, escapeHtml, text } = require('../fact-template-utils');
 const {
   appendUnique,
   injectBeforeEvidenceGrid,
+  renderScenarioActionPanel,
   renderScenarioCard,
   renderScenarioList,
   renderScenarioShell,
@@ -312,6 +313,7 @@ function renderConfiguredPage(report, config) {
     children: `
       ${renderMetricStrip(report, config)}
       ${renderReadinessPanel(report, config)}
+      ${renderScenarioActionPanel(report)}
       ${renderSpecializedVisual(report, config)}
       ${renderScenarioCard(
         config.verdictTitle || '直接裁决',

@@ -250,6 +250,13 @@
       final_actions: safeArray(raw.final_actions || raw.next_actions).map((v) => safeText(v)).filter(Boolean),
       raw,
     };
+    const actionContracts = global.DuoliScenarioActionContracts;
+    if (actionContracts && typeof actionContracts.ensureActionablePayload === 'function') {
+      actionContracts.ensureActionablePayload(report, {
+        taskType: report.meta && report.meta.task_type,
+        question: report.meta && (report.meta.question_original || report.meta.question_refined),
+      });
+    }
     report.isStructuredFactReport = true;
     return report;
   }

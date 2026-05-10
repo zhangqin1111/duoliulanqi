@@ -1000,6 +1000,81 @@ function css() {
       font-size: 10.5px;
       line-height: 1.55;
     }
+    .scenario-action-panel {
+      background:
+        radial-gradient(circle at 6% 8%, rgba(53,107,255,.12), transparent 34%),
+        linear-gradient(135deg, #fff, #f8f5ef);
+    }
+    .scenario-action-hero {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 4mm;
+      margin-bottom: 4mm;
+    }
+    .scenario-action-hero article {
+      padding: 4mm;
+      border-radius: 16px;
+      background: rgba(255,255,255,.78);
+      border: 1px solid rgba(53,107,255,.12);
+    }
+    .scenario-action-hero span {
+      display: block;
+      margin-bottom: 1.5mm;
+      color: #7a746d;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .scenario-action-hero strong {
+      display: block;
+      color: #111827;
+      font-size: 18px;
+      line-height: 1.35;
+    }
+    .scenario-action-hero p {
+      margin: 2mm 0 0;
+      color: #665c52;
+      font-size: 11px;
+      line-height: 1.65;
+    }
+    .scenario-action-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 3mm;
+    }
+    .scenario-action-grid > div {
+      padding: 3.5mm;
+      border-radius: 15px;
+      background: #f8f5f1;
+      border: 1px solid rgba(32,33,36,.06);
+      break-inside: avoid;
+    }
+    .scenario-action-grid b {
+      display: block;
+      margin-bottom: 2mm;
+      color: #356bff;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .scenario-action-grid p {
+      margin: 0 0 2mm;
+      color: #665c52;
+      font-size: 10.5px;
+      line-height: 1.55;
+    }
+    .scenario-action-grid p:last-child { margin-bottom: 0; }
+    .scenario-action-grid p strong {
+      display: block;
+      color: #111827;
+      font-size: 11px;
+    }
+    .consumer-price-table td:nth-child(2),
+    .consumer-price-table td:nth-child(3) {
+      color: #111827;
+      font-weight: 800;
+    }
     .fact-list, .diff-list, .model-list, .raw-list { display: grid; gap: 3mm; }
     .diff-list { display: block; }
     .weighted-timeline {
