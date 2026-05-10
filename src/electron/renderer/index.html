@@ -58,16 +58,6 @@
             </header>
 
             <section class="pane-meta">
-              <div class="meta-pills">
-                <label class="meta-pill">
-                  <input type="checkbox" id="chk-reply-idle" checked />
-                  <span>等待长回复稳定后再判定完成</span>
-                </label>
-                <label class="meta-pill">
-                  <input type="checkbox" id="chk-auto-summarize" checked />
-                  <span>发送后自动生成结构化对比</span>
-                </label>
-              </div>
               <p id="status" class="status" aria-live="polite"></p>
             </section>
 
@@ -266,6 +256,8 @@
     <script src="recovery-actions.js"></script>
     <script src="high-risk-classifier.js"></script>
     <script src="evidence-query-planner.js"></script>
+    <script src="model-replies-modal-presenter.js"></script>
+    <script src="difference-modal-presenter.js"></script>
     <script src="chat-flow-presenter.js"></script>
     <script src="composer-presenter.js"></script>
     <script src="status-presenter.js"></script>
@@ -278,6 +270,8 @@
     <script src="ui-wiring-composition.js"></script>
     <script src="workbench-bootstrap.js"></script>
     <script src="truth-seeking-core.js"></script>
+    <script src="report-material-compressor.js"></script>
+    <script src="fast-report-builder.js"></script>
     <script src="report-completeness-repair.js"></script>
     <script src="report-completeness-orchestrator.js"></script>
     <script src="truth-seeking-prompts.js"></script>

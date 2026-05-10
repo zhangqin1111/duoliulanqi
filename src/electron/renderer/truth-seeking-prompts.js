@@ -204,19 +204,46 @@
   }
 
   function buildFinalTracePrompt(question, modelReplies, diffAnalyses, pollution, originalQuestion, selfCleansing, taskRoute, highRisk, evidencePlan, evidencePack) {
+    const compressor = global.DuoliReportMaterialCompressor;
+    const compact =
+      compressor && typeof compressor.compactFinalTraceInput === 'function'
+        ? compressor.compactFinalTraceInput({
+            question,
+            originalQuestion,
+            modelReplies,
+            diffAnalyses,
+            pollution,
+            selfCleansing,
+            taskRoute,
+            highRisk,
+            evidencePlan,
+            evidencePack,
+          })
+        : {
+            question,
+            originalQuestion,
+            modelReplies,
+            diffAnalyses,
+            pollution,
+            selfCleansing,
+            taskRoute,
+            highRisk,
+            evidencePlan,
+            evidencePack,
+          };
     const api = global.DuoliEvaluationReportPrompt;
     if (api && typeof api.buildEvaluationReportPrompt === 'function') {
       return api.buildEvaluationReportPrompt({
-        question,
-        originalQuestion,
-        modelReplies,
-        diffAnalyses,
-        pollution,
-        selfCleansing,
-        taskRoute,
-        highRisk,
-        evidencePlan,
-        evidencePack,
+        question: compact.question,
+        originalQuestion: compact.originalQuestion,
+        modelReplies: compact.modelReplies,
+        diffAnalyses: compact.diffAnalyses,
+        pollution: compact.pollution,
+        selfCleansing: compact.selfCleansing,
+        taskRoute: compact.taskRoute,
+        highRisk: compact.highRisk,
+        evidencePlan: compact.evidencePlan,
+        evidencePack: compact.evidencePack,
       });
     }
     return [

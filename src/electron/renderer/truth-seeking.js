@@ -248,6 +248,9 @@
       if (typeof deps.completeFlowStage === 'function') {
         deps.completeFlowStage('dispatch', '多模型回复已收集，开始进入差异识别。');
       }
+      if (typeof deps.showModelRepliesCard === 'function') {
+        deps.showModelRepliesCard(modelReplies);
+      }
 
       if (typeof deps.setFlowStage === 'function') {
         deps.setFlowStage('extract', '正在抽取差异', '系统正在从多模型回答里识别事实、口径、因果和建议差异。', 'active');
@@ -314,12 +317,33 @@
         deps.completeFlowStage('pollution', '污染剔除和模型自审已完成，准备生成最终报告。');
       }
 
-      if (typeof deps.setFlowStage === 'function') {
-        deps.setFlowStage('report', '正在生成报告', '正在把源头分析、污染剔除和模型选型建议整合成最终报告。', 'active');
-      }
-      renderAnalysisProgress(session, '正在生成追根溯源结论');
-      let accumulated = '';
       const summaryBodyEl = getSummaryBodyEl();
+      if (global.DuoliFastReportBuilder && typeof global.DuoliFastReportBuilder.buildFastReportText === 'function') {
+        session.reportStatus = 'draft';
+        session.finalText = global.DuoliFastReportBuilder.buildFastReportText(session);
+        session.fastReportReadyAt = new Date().toISOString();
+        setSession(session);
+        if (summaryBodyEl) {
+          summaryBodyEl.textContent = session.finalText;
+          refreshComparePanel();
+          summaryBodyEl.scrollTop = summaryBodyEl.scrollHeight;
+        }
+        if (typeof deps.showCompareReadyCard === 'function') {
+          deps.showCompareReadyCard({
+            title: '报告初稿已生成',
+            detail: '已先生成本地决策摘要，专业完整版仍在后台审计生成；导出 PDF 请等待完整版完成。',
+            buttonText: '查看初稿',
+          });
+        }
+      }
+
+      if (typeof deps.setFlowStage === 'function') {
+        deps.setFlowStage('report', '正在生成专业完整版', '初稿已可查看；系统正在压缩材料并生成最终可导出的完整报告。', 'active');
+      }
+      if (session.reportStatus !== 'draft') {
+        renderAnalysisProgress(session, '正在生成追根溯源结论');
+      }
+      let accumulated = '';
       const r = await api.qwenStream(
         prompts().buildFinalTracePrompt(
           question,
@@ -337,7 +361,6 @@
           accumulated += delta;
           if (summaryBodyEl) {
             summaryBodyEl.textContent = core().renderFinalAnalysisText(accumulated, session);
-            refreshComparePanel();
             summaryBodyEl.scrollTop = summaryBodyEl.scrollHeight;
           }
         },
@@ -363,7 +386,6 @@
             accumulated += delta;
             if (summaryBodyEl) {
               summaryBodyEl.textContent = core().renderFinalAnalysisText(accumulated, session);
-              refreshComparePanel();
               summaryBodyEl.scrollTop = summaryBodyEl.scrollHeight;
             }
           },
@@ -379,6 +401,7 @@
       if (!r.ok) {
         throw new Error(r.error || '最终裁决生成失败。');
       }
+      session.reportStatus = 'finalizing';
       session.finalText = (accumulated || r.text || '').trim();
       if (
         global.DuoliReportCompletenessOrchestrator &&
@@ -400,6 +423,8 @@
           checkedAt: new Date().toISOString(),
         };
       }
+      session.reportStatus = 'complete';
+      session.completedReportReadyAt = new Date().toISOString();
       setSession(session);
       if (typeof deps.completeFlowStage === 'function') {
         deps.completeFlowStage('report', '最终报告已生成，可以打开对比弹层查看完整内容。');

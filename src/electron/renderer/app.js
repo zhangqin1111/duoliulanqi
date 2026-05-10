@@ -162,6 +162,7 @@ function getAppComposition() {
         syncQuestionChip,
         showCompareReadyCard,
         showDiffDetailsCard,
+        showModelRepliesCard,
         waitUntilGuestLoaded,
         wireExportPdf,
         wireLicenseGate,
@@ -188,7 +189,7 @@ function getChatFlowPresenter() {
   return getAppComposition().chatFlowPresenter();
 }
 
-const resetChatFlow = () => getChatFlowPresenter().reset(), appendUserChatMessage = (text) => getChatFlowPresenter().appendUserMessage(text), setFlowStage = (key, title, detail, state) => getChatFlowPresenter().upsertStage(key, title, detail, state), completeFlowStage = (key, detail) => getChatFlowPresenter().completeStage(key, detail), failFlowStage = (key, detail) => getChatFlowPresenter().failStage(key, detail), showCompareReadyCard = (options) => getChatFlowPresenter().showResultCard(options || {}), showDiffDetailsCard = (diffs) => getChatFlowPresenter().showDiffDetailsCard(diffs);
+const resetChatFlow = () => getChatFlowPresenter().reset(), appendUserChatMessage = (text) => getChatFlowPresenter().appendUserMessage(text), setFlowStage = (key, title, detail, state) => getChatFlowPresenter().upsertStage(key, title, detail, state), completeFlowStage = (key, detail) => getChatFlowPresenter().completeStage(key, detail), failFlowStage = (key, detail) => getChatFlowPresenter().failStage(key, detail), showCompareReadyCard = (options) => getChatFlowPresenter().showResultCard(options || {}), showDiffDetailsCard = (diffs) => getChatFlowPresenter().showDiffDetailsCard(diffs), showModelRepliesCard = (replies) => getChatFlowPresenter().showModelRepliesCard(replies);
 
 async function handleRecoveryAction(action) {
   const id = action && action.id;

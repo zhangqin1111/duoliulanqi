@@ -65,6 +65,7 @@
         '    <div class="stage-copy">',
         '      <strong class="stage-title"></strong>',
         '      <p class="stage-detail"></p>',
+        '      <div class="stage-actions"></div>',
         '    </div>',
         '  </div>',
         '  <div class="stage-glow" aria-hidden="true"></div>',
@@ -98,6 +99,32 @@
 
     function failStage(key, detail) {
       upsertStage(key, STAGE_LABELS[key] || '处理失败', detail || '这一阶段没有完成，请稍后重试。', 'error');
+    }
+
+    function showModelRepliesCard(replies) {
+      const list = Array.isArray(replies) ? replies : [];
+      if (!list.length) return;
+      const node = stageNodes.get('dispatch');
+      if (!node) return;
+      const actions = node.querySelector('.stage-actions');
+      if (!actions) return;
+      actions.textContent = '';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ghost stage-action-btn';
+      button.textContent = `查看 ${list.length} 个 AI 回复`;
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (typeof deps.openModelRepliesModal === 'function') deps.openModelRepliesModal(list);
+      });
+      actions.appendChild(button);
+      const bubble = node.querySelector('.chat-bubble--system');
+      if (bubble) {
+        bubble.classList.add('chat-bubble--clickable');
+        bubble.onclick = () => {
+          if (typeof deps.openModelRepliesModal === 'function') deps.openModelRepliesModal(list);
+        };
+      }
     }
 
     function showResultCard(options) {
@@ -172,55 +199,32 @@
         '    </div>',
         '    <button type="button" class="ghost diff-card__toggle">查看差异详情</button>',
         '  </div>',
-        '  <div class="diff-card__body" hidden></div>',
+        '  <p class="diff-card__summary"></p>',
+        '  <div class="diff-card__preview"></div>',
         '</div>',
       ].join('');
       card.querySelector('h3').textContent = `已识别 ${list.length} 个差异点`;
-      const body = card.querySelector('.diff-card__body');
-      list.forEach((diff, index) => {
-        const item = document.createElement('section');
-        item.className = 'diff-detail';
-        const title = document.createElement('div');
-        title.className = 'diff-detail__title';
-        title.textContent = `${diff.id || `D${index + 1}`} · ${diff.type || '未分类'} · ${diff.severity || 'low'}`;
-        const topic = document.createElement('h4');
-        topic.textContent = diff.topic || `差异 ${index + 1}`;
-        const why = document.createElement('p');
-        why.className = 'diff-detail__why';
-        why.textContent = diff.why_it_matters || '该差异会影响后续追问和最终报告判断。';
-        const claims = document.createElement('div');
-        claims.className = 'diff-detail__claims';
-        const claimList = Array.isArray(diff.claims) ? diff.claims : [];
-        if (claimList.length) {
-          claimList.forEach((claim) => {
-            const row = document.createElement('p');
-            const model = document.createElement('strong');
-            model.textContent = claim.model || '未知模型';
-            const text = document.createElement('span');
-            text.textContent = `：${claim.claim || ''}`;
-            row.appendChild(model);
-            row.appendChild(text);
-            claims.appendChild(row);
-          });
-        } else {
-          const empty = document.createElement('p');
-          empty.textContent = '暂未抽取到明确模型 claim。';
-          claims.appendChild(empty);
-        }
-        item.appendChild(title);
-        item.appendChild(topic);
-        item.appendChild(why);
-        item.appendChild(claims);
-        body.appendChild(item);
+      card.querySelector('.diff-card__summary').textContent =
+        '差异详情将以独立浮层展示，不再占用左侧聊天流程空间。';
+      const preview = card.querySelector('.diff-card__preview');
+      list.slice(0, 4).forEach((diff, index) => {
+        const chip = document.createElement('span');
+        chip.textContent = `${diff.id || `D${index + 1}`} · ${diff.type || '未分类'}`;
+        preview.appendChild(chip);
       });
+      if (list.length > 4) {
+        const more = document.createElement('span');
+        more.textContent = `+${list.length - 4}`;
+        preview.appendChild(more);
+      }
 
       const toggle = card.querySelector('.diff-card__toggle');
-      toggle.addEventListener('click', () => {
-        const open = body.hasAttribute('hidden');
-        if (open) body.removeAttribute('hidden');
-        else body.setAttribute('hidden', '');
-        toggle.textContent = open ? '收起差异详情' : '查看差异详情';
-        scrollToBottom();
+      toggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (typeof deps.openDiffDetailsModal === 'function') deps.openDiffDetailsModal(list);
+      });
+      card.querySelector('.diff-card').addEventListener('click', () => {
+        if (typeof deps.openDiffDetailsModal === 'function') deps.openDiffDetailsModal(list);
       });
 
       flowEl.appendChild(card);
@@ -233,6 +237,7 @@
       failStage,
       reset,
       showDiffDetailsCard,
+      showModelRepliesCard,
       showResultCard,
       upsertStage,
     };

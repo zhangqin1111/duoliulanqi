@@ -26,9 +26,27 @@
           getEmptyEl: () => ctx.elements.chatEmptyEl,
           getFlowEl: () => ctx.elements.chatFlowEl,
           getThreadScrollEl: () => ctx.elements.threadScrollEl,
+          openDiffDetailsModal: (diffs) => differenceModalPresenter().open(diffs),
+          openModelRepliesModal: (replies) => modelRepliesModalPresenter().open(replies),
           openComparePanel: ctx.actions.openComparePanel,
           onRecoveryAction: ctx.actions.handleRecoveryAction,
         }),
+      });
+    }
+
+    function modelRepliesModalPresenter() {
+      return controller('modelRepliesModalPresenter', {
+        moduleName: 'DuoliModelRepliesModalPresenter',
+        factoryName: 'createModelRepliesModalPresenter',
+        label: 'Model replies modal presenter',
+      });
+    }
+
+    function differenceModalPresenter() {
+      return controller('differenceModalPresenter', {
+        moduleName: 'DuoliDifferenceModalPresenter',
+        factoryName: 'createDifferenceModalPresenter',
+        label: 'Difference modal presenter',
       });
     }
 
@@ -149,6 +167,7 @@
           failFlowStage: ctx.actions.failFlowStage,
           showCompareReadyCard: ctx.actions.showCompareReadyCard,
           showDiffDetailsCard: ctx.actions.showDiffDetailsCard,
+          showModelRepliesCard: ctx.actions.showModelRepliesCard,
           chatPlatforms: ctx.actions.chatPlatforms,
           waitUntilGuestLoaded: ctx.actions.waitUntilGuestLoaded,
           setColStatus: ctx.actions.setColStatus,

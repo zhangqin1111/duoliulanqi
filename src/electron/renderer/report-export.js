@@ -1,5 +1,14 @@
 (function attachReportExport(global) {
   function createReportExporter(deps) {
+    function isDraftPayload(payload) {
+      const session = payload && payload.analysisSession ? payload.analysisSession : null;
+      const report = payload && payload.structuredReport ? payload.structuredReport : null;
+      return (
+        (session && session.reportStatus === 'draft') ||
+        (report && report.meta && (report.meta.report_status === 'draft' || report.meta.generation_phase === 'fast_local_draft'))
+      );
+    }
+
     function wire() {
       const btn = deps.getButton ? deps.getButton() : document.getElementById('btnExportPdf');
       if (!btn) return;
@@ -22,6 +31,10 @@
               : null;
           if (!payload) {
             throw new Error('报告数据为空，无法导出。');
+          }
+          if (isDraftPayload(payload)) {
+            btn.textContent = '完整版生成中';
+            return;
           }
           const result = await api.exportPdf(payload);
           if (result && result.ok) {

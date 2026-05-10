@@ -6,7 +6,10 @@
       const api = typeof deps.getApi === 'function' ? deps.getApi() : deps.api;
       const platforms = typeof deps.getPlatforms === 'function' ? deps.getPlatforms() : [];
       if (!api || !platforms.length || typeof api.reportEmbedBounds !== 'function') return;
-      const hideMainViews = document.body.classList.contains('has-compare-open');
+      const hideMainViews =
+        document.body.classList.contains('has-compare-open') ||
+        document.body.classList.contains('is-difference-modal-open') ||
+        document.body.classList.contains('is-model-replies-modal-open');
       const slots = platforms
         .map((cfg) => {
           if (hideMainViews) {
@@ -37,6 +40,8 @@
         });
       });
     }
+
+    window.addEventListener('duoli:overlay-bounds-change', schedule);
 
     return { push, schedule };
   }
