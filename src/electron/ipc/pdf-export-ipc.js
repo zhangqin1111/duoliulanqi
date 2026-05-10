@@ -67,7 +67,36 @@ function writeStructuredSidecar(filePath, payload, structured, repaired) {
   return structuredPath;
 }
 
+function prepareStructuredReport(payload = {}) {
+  const repaired = repairStructuredReport(payload);
+  const structuredWithPolicy = applyHighRiskPolicy(
+    repaired.structured,
+    payload && payload.analysisSession ? payload.analysisSession.highRisk : null
+  );
+  const structured = applyReportQualityGate(
+    enrichReportOutcome(
+      bindEvidenceToReport(structuredWithPolicy, payload && payload.analysisSession ? payload.analysisSession.evidencePack : null)
+    )
+  );
+  return { repaired, structured };
+}
+
 function registerPdfExportIpc({ ipcMain, app, BrowserWindow, dialog, getMainWindow, assertLicenseValid, reportTemplateRegistry }) {
+  ipcMain.handle('duoli:render-report-html', async (_event, payload = {}) => {
+    assertLicenseValid();
+    const summaryText = String(payload && payload.summaryText ? payload.summaryText : '').trim();
+    const rawReplies = Array.isArray(payload && payload.rawReplies) ? payload.rawReplies : [];
+    const hasRawReply = rawReplies.some((reply) => String(reply && reply.text ? reply.text : '').trim());
+    if (!summaryText && !hasRawReply) return { ok: false, error: 'Nothing to render.' };
+
+    const { structured } = prepareStructuredReport(payload);
+    return {
+      ok: true,
+      html: reportTemplateRegistry.buildReportHtml(payload, structured),
+      structured,
+    };
+  });
+
   ipcMain.handle('duoli:export-pdf', async (_event, payload = {}) => {
     assertLicenseValid();
     const summaryText = String(payload && payload.summaryText ? payload.summaryText : '').trim();
@@ -82,16 +111,7 @@ function registerPdfExportIpc({ ipcMain, app, BrowserWindow, dialog, getMainWind
     });
     if (canceled || !filePath) return { ok: false, error: 'canceled' };
 
-    const repaired = repairStructuredReport(payload);
-    const structuredWithPolicy = applyHighRiskPolicy(
-      repaired.structured,
-      payload && payload.analysisSession ? payload.analysisSession.highRisk : null
-    );
-    const structured = applyReportQualityGate(
-      enrichReportOutcome(
-        bindEvidenceToReport(structuredWithPolicy, payload && payload.analysisSession ? payload.analysisSession.evidencePack : null)
-      )
-    );
+    const { repaired, structured } = prepareStructuredReport(payload);
     const html = reportTemplateRegistry.buildReportHtml(payload, structured);
     const tmpHtml = path.join(os.tmpdir(), `duoli_pdf_${Date.now()}.html`);
     fs.writeFileSync(tmpHtml, html, 'utf8');
@@ -121,5 +141,6 @@ function registerPdfExportIpc({ ipcMain, app, BrowserWindow, dialog, getMainWind
 
 module.exports = {
   extractStructuredJson,
+  prepareStructuredReport,
   registerPdfExportIpc,
 };

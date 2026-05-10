@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('duoliulan', {
   saveDashScopeKey: (key) => ipcRenderer.invoke('duoli:save-dashscope-key', { key }),
   clearDashScopeKeyFile: () => ipcRenderer.invoke('duoli:clear-dashscope-key-file'),
   qwenComplete: (prompt, options) => ipcRenderer.invoke('duoli:qwen-complete', { prompt, options }),
+  renderReportHtml: (payload) => ipcRenderer.invoke('duoli:render-report-html', payload),
   exportPdf: (payload) => ipcRenderer.invoke('duoli:export-pdf', payload),
   listReportHistory: () => ipcRenderer.invoke('duoli:report-history-list'),
   addReportHistory: (item) => ipcRenderer.invoke('duoli:report-history-add', item),

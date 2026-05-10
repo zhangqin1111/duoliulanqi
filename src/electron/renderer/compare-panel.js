@@ -1,5 +1,7 @@
 (function attachComparePanel(global) {
   function createComparePanel(deps) {
+    let renderSeq = 0;
+
     function escapeHtml(text) {
       return String(text || '')
         .replace(/&/g, '&amp;')
@@ -60,10 +62,37 @@
         .join('');
     }
 
-    function refresh() {
+    async function renderUnifiedReportPreview(body) {
+      const api = deps.getApi ? deps.getApi() : null;
+      if (!api || typeof api.renderReportHtml !== 'function' || typeof deps.buildReportPayload !== 'function') return false;
+      const seq = ++renderSeq;
+      body.classList.add('compare-panel__body--pdf-preview');
+      body.classList.remove('compare-panel__body--intel');
+      body.innerHTML = '<div class="compare-panel__loading">正在生成与 PDF 完全一致的预览...</div>';
+      const payload = deps.buildReportPayload(deps.getQuestionText ? deps.getQuestionText() : '');
+      if (!payload) return false;
+      const result = await api.renderReportHtml(payload);
+      if (seq !== renderSeq) return true;
+      if (!result || !result.ok || !result.html) return false;
+      body.innerHTML = '<iframe class="compare-report-frame" title="报告预览"></iframe>';
+      const frame = body.querySelector('.compare-report-frame');
+      if (frame) frame.srcdoc = result.html;
+      return true;
+    }
+
+    async function refresh() {
       const summaryText = deps.getSummaryText();
       const comparePanel = deps.getComparePanel();
       const body = comparePanel ? comparePanel.querySelector('.compare-panel__body') : null;
+      if (body) {
+        try {
+          const rendered = await renderUnifiedReportPreview(body);
+          if (rendered) return;
+        } catch (error) {
+          console.warn('[duoli] unified report preview failed, fallback to renderer preview', error);
+        }
+        body.classList.remove('compare-panel__body--pdf-preview');
+      }
       const structured = extractStructuredReport(summaryText);
       if (body && structured && global.DuoliReportPresenter && typeof global.DuoliReportPresenter.renderReport === 'function') {
         body.classList.add('compare-panel__body--intel');
