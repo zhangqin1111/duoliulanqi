@@ -143,6 +143,7 @@ function getAppComposition() {
         resetChatFlow,
         resizeComposerInput,
         runCompareAndSummarize,
+        runApiOnlyAsk,
         runConcurrentAsk,
         runTruthSeekingAnalysis,
         schedulePushBounds,
@@ -419,6 +420,10 @@ function getAiConversationController() {
   return getAppComposition().aiConversation();
 }
 
+function getApiOnlyAnalysisRunner() {
+  return getAppComposition().apiOnlyAnalysisRunner();
+}
+
 function getQuestionRefiner() {
   return getAppComposition().questionRefiner();
 }
@@ -436,7 +441,14 @@ function routeQuestion(rawQuestion) {
 }
 
 async function runConcurrentAsk(question) {
+  if (!chatPlatforms().length) {
+    return runApiOnlyAsk(question);
+  }
   return getAiConversationController().runConcurrentAsk(question);
+}
+
+async function runApiOnlyAsk(question, opt) {
+  return getApiOnlyAnalysisRunner().runConcurrentAsk(question, opt || {});
 }
 
 async function runCompareAndSummarize(question, opt) {

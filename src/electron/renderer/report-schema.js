@@ -134,7 +134,7 @@
     const source = item || {};
     return {
       id: safeText(source.id, `F${index + 1}`),
-      time: safeText(source.time || source.date, '最近/当前'),
+      time: safeText(source.time || source.date, '未指定时间/待核验'),
       event: safeText(source.event || source.claim || source.fact, '未命名事实点'),
       status: safeText(source.status, 'uncertain'),
       sources: safeArray(source.sources || source.models).map((v) => safeText(v)).filter(Boolean),
@@ -246,6 +246,7 @@
         retained_judgment: safeText(sourceDiagnosis.retained_judgment || raw.final_judgment, ''),
       },
       scenario_decision: normalizeScenarioDecision(raw.scenario_decision || raw.decision_brief, fallback || {}),
+      scenario_payload: raw.scenario_payload && typeof raw.scenario_payload === 'object' ? raw.scenario_payload : {},
       final_actions: safeArray(raw.final_actions || raw.next_actions).map((v) => safeText(v)).filter(Boolean),
       raw,
     };

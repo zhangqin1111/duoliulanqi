@@ -96,7 +96,7 @@ function renderAxisMap(items) {
       ${list
         .map((item, idx) => {
           const x = clamp(item.heat, 8, 92);
-          const y = clamp(100 - clamp(item.credibility, 8, 92), 12, 72);
+          const y = clamp(100 - clamp(item.credibility, 8, 92), 14, 62);
           const size = 11 + clamp(item.weight, 0, 100) / 7;
           const labelSide = y > 58 ? 'top' : 'bottom';
           return `

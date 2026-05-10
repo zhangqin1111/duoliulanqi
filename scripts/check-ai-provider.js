@@ -7,8 +7,20 @@ async function main() {
   });
 
   const list = registry.list();
-  if (!list.some((provider) => provider.id === 'qwen')) {
-    throw new Error('Qwen provider is not registered');
+  const requiredProviders = ['qwen', 'deepseek', 'openai', 'zhipu', 'claude'];
+  const ids = new Set(list.map((provider) => provider.id));
+  for (const id of requiredProviders) {
+    if (!ids.has(id)) {
+      throw new Error(`${id} provider is not registered`);
+    }
+  }
+  for (const provider of list) {
+    if (!provider.capabilities || provider.capabilities.complete !== true) {
+      throw new Error(`${provider.id} provider missing completion capability`);
+    }
+    if (!provider.model) {
+      throw new Error(`${provider.id} provider missing default model`);
+    }
   }
   const result = await registry.complete('qwen', '测试 provider');
   if (!result.ok || !result.text || result.providerId !== 'qwen') {

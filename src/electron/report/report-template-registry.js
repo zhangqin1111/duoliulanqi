@@ -1,23 +1,40 @@
 'use strict';
 
 const factTemplate = require('./fact-template');
+const consumerTemplate = require('./scenarios/consumer-template');
+const publicOpinionTemplate = require('./scenarios/public-opinion-template');
+const technicalTemplate = require('./scenarios/technical-template');
+const factCheckTemplate = require('./scenarios/fact-check-template');
+const competitorTemplate = require('./scenarios/competitor-template');
+const investmentTemplate = require('./scenarios/investment-template');
+const legalTemplate = require('./scenarios/legal-template');
+const knowledgeTemplate = require('./scenarios/knowledge-template');
+const creativeTemplate = require('./scenarios/creative-template');
+const learningTemplate = require('./scenarios/learning-template');
+const travelTemplate = require('./scenarios/travel-template');
+const careerTemplate = require('./scenarios/career-template');
+const medicalTemplate = require('./scenarios/medical-template');
+const financeTemplate = require('./scenarios/finance-template');
+const generalTemplate = require('./scenarios/general-template');
+const { enrichReportOutcome } = require('./report-outcome-enricher');
+const { applyReportQualityGate } = require('./report-quality-gate');
 
 const TEMPLATE_BY_TASK = {
-  public_opinion: factTemplate,
-  fact_check: factTemplate,
-  competitor_analysis: factTemplate,
-  consumer_purchase: factTemplate,
-  investment_research: factTemplate,
-  legal_risk: factTemplate,
-  knowledge_brief: factTemplate,
-  creative_content: factTemplate,
-  technical_diagnosis: factTemplate,
-  learning_research: factTemplate,
-  travel_lifestyle: factTemplate,
-  career_recruiting: factTemplate,
-  medical_health: factTemplate,
-  finance_planning: factTemplate,
-  general_compare: factTemplate,
+  public_opinion: publicOpinionTemplate,
+  fact_check: factCheckTemplate,
+  competitor_analysis: competitorTemplate,
+  consumer_purchase: consumerTemplate,
+  investment_research: investmentTemplate,
+  legal_risk: legalTemplate,
+  knowledge_brief: knowledgeTemplate,
+  creative_content: creativeTemplate,
+  technical_diagnosis: technicalTemplate,
+  learning_research: learningTemplate,
+  travel_lifestyle: travelTemplate,
+  career_recruiting: careerTemplate,
+  medical_health: medicalTemplate,
+  finance_planning: financeTemplate,
+  general_compare: generalTemplate,
 };
 
 function taskTypeOf(structured) {
@@ -36,7 +53,8 @@ function resolveTemplate(structured) {
 }
 
 function buildReportHtml(payload, structured) {
-  return resolveTemplate(structured).buildReportHtml(payload, structured);
+  const enriched = applyReportQualityGate(enrichReportOutcome(structured));
+  return resolveTemplate(enriched).buildReportHtml(payload, enriched);
 }
 
 module.exports = {

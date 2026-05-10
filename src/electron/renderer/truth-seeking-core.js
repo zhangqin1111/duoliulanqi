@@ -36,12 +36,19 @@
   }
 
   async function qwenJson(api, prompt, fallback, options) {
-    if (!api || typeof api.qwenComplete !== 'function') return fallback;
-    const r = await api.qwenComplete(prompt, options || { timeoutMs: 120000, retries: 1 });
-    if (!r || !r.ok) {
-      throw new Error((r && r.error) || 'Qwen JSON request failed.');
+    const completion = global.DuoliProviderCompletion;
+    let response = null;
+    if (completion && typeof completion.completeText === 'function') {
+      response = await completion.completeText(api, prompt, options || { timeoutMs: 120000, retries: 1 });
+    } else if (api && typeof api.qwenComplete === 'function') {
+      response = await api.qwenComplete(prompt, options || { timeoutMs: 120000, retries: 1 });
+    } else {
+      return fallback;
     }
-    return parseJsonLoose(r.text) || fallback;
+    if (!response || !response.ok) {
+      throw new Error((response && response.error) || 'Structured JSON request failed.');
+    }
+    return parseJsonLoose(response.text) || fallback;
   }
 
   function normalizeDiffs(payload) {
@@ -80,7 +87,7 @@
         })),
         severity: 'medium',
         needs_followup: true,
-        why_it_matters: '差异抽取器未返回明确差异时，仍需要让模型围绕事实源头、核验路径和污染因素进行二次自证，避免直接生成未经追问的报告。',
+        why_it_matters: '差异抽取器未返回明确差异时，仍需让模型围绕事实源头、核验路径和污染因素进行二次自证。',
       },
     ];
   }

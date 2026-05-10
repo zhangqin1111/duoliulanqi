@@ -17,6 +17,14 @@
     const cfg = config || {};
     function buildRefinePrompt(rawQuestion, context) {
       const hasDateHint = !!(context && context.hasDateHint);
+      const timeRule =
+        (context && context.timeBoundaryRule) ||
+        (hasDateHint
+          ? '用户给了明确时间或范围：必须沿用用户边界，不要自行扩大或替换。'
+          : '用户没有给出明确时间边界：不要替用户补具体年份、月份、日期、起止时间或“最新/当前”等事实前提；只补核验维度、输出结构和需要 AI 自行确认的资料时效。');
+      const noFactRule =
+        (context && context.noFactInjectionRule) ||
+        '补全只补任务维度、核验口径、输出字段和追问方向；不得替用户直接回答确定事实。';
       return [
         `你是“滤镜工作台”的${cfg.label}任务书生成器。`,
         `用户可能只说一句很短的问题。你的任务是把它补全成可分发给多个 AI 的“${cfg.label}”任务。`,
@@ -25,9 +33,8 @@
         '',
         '硬性约束：',
         '1. 不替用户预设最终结论；不编造外部事实、数据、引用、价格、病例、收益或法律结论。',
-        hasDateHint
-          ? '2. 用户给了明确时间或范围：必须沿用用户边界，不要自行扩大或替换。'
-          : '2. 用户没有明确时间：按“当前/最近公开信息”理解，但不得编造具体日期。',
+        `1A. ${noFactRule}`,
+        `2. ${timeRule}`,
         `3. 必须要求模型输出：${cfg.requiredOutputs}`,
         `4. 必须显式区分：可验证事实、模型推断、主观建议、风险/不确定性、仍需补充的信息。`,
         '5. 不要要求网页模型输出 JSON；最终报告 JSON 由系统统一生成。',

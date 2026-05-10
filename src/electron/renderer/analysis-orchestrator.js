@@ -4,7 +4,7 @@
       const summaryBodyEl = deps.getSummaryBodyEl();
       if (!summaryBodyEl) return;
 
-      if (!deps.isQwenApiOk()) {
+      if (false && !deps.isQwenApiOk()) {
         summaryBodyEl.textContent =
           '未配置千问 API。请点击左侧「API 密钥设置」保存 DashScope Key，或设置环境变量后重启应用。';
         if (typeof deps.failFlowStage === 'function') {

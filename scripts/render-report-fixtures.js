@@ -1,5 +1,4 @@
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { spawnSync } = require('child_process');
@@ -14,30 +13,21 @@ if (typeof electron === 'string') {
 const { app, BrowserWindow } = electron;
 const reportTemplateRegistry = require('../src/electron/report/report-template-registry');
 const { repairStructuredReport } = require('../src/electron/report/report-json-repair');
+const { createReportFixturePayload, readReportFixtures } = require('./report-fixture-utils');
 
 app.on('window-all-closed', (event) => {
   event.preventDefault();
 });
 
 const repoRoot = path.resolve(__dirname, '..');
-const fixturePath = path.join(repoRoot, 'fixtures', 'reports', 'report-fixtures.json');
 const outputDir = path.join(repoRoot, 'tmp_pdf_review');
-
-function readFixtures() {
-  return JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
-}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function renderOneAttempt(fixture) {
-  const payload = {
-    question: fixture.question,
-    rawReplies: (fixture.structured.meta.models || []).map((name) => ({ name, text: `${name} fixture reply` })),
-    structuredReport: fixture.structured,
-    taskRoute: { task_type: fixture.taskType, label: fixture.taskType },
-  };
+  const payload = createReportFixturePayload(fixture);
   const repaired = repairStructuredReport(payload);
   const html = reportTemplateRegistry.buildReportHtml(payload, repaired.structured);
   const htmlPath = path.join(outputDir, `${fixture.id}.html`);
@@ -55,7 +45,7 @@ async function renderOneAttempt(fixture) {
       preferCSSPageSize: true,
     });
     fs.writeFileSync(pdfPath, pdf);
-    return { id: fixture.id, htmlPath, pdfPath, bytes: pdf.length };
+    return { id: fixture.id, taskType: fixture.taskType, htmlPath, pdfPath, bytes: pdf.length };
   } finally {
     if (!win.isDestroyed()) win.destroy();
   }
@@ -77,7 +67,7 @@ async function renderOne(fixture) {
 async function main() {
   await app.whenReady();
   fs.mkdirSync(outputDir, { recursive: true });
-  const fixtures = readFixtures();
+  const fixtures = readReportFixtures();
   const manifest = [];
   for (const fixture of fixtures) {
     const result = await renderOne(fixture);

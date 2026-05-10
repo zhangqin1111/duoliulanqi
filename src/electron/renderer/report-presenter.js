@@ -53,7 +53,7 @@
                   .map(
                     (item) => `
                     <article class="intel-fact intel-fact--${escapeHtml(item.status || 'uncertain')}">
-                      <div class="intel-fact__time">${escapeHtml(item.time || '最近/当前')}</div>
+                      <div class="intel-fact__time">${escapeHtml(item.time || '未指定时间/待核验')}</div>
                       <div class="intel-fact__body">
                         <strong>${escapeHtml(item.event || item.claim || '')}</strong>
                         ${item.note ? `<p>${escapeHtml(item.note)}</p>` : ''}

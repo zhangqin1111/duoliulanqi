@@ -1,5 +1,7 @@
 'use strict';
 
+const { scenarioVisualCss } = require('./scenario-visual-styles');
+
 function css() {
   return `
     @page { size: A4; margin: 0; }
@@ -822,7 +824,7 @@ function css() {
       position: relative;
       height: 54mm;
       border-radius: 14px;
-      overflow: hidden;
+      overflow: visible;
       background:
         linear-gradient(90deg, rgba(32,33,36,.05) 1px, transparent 1px),
         linear-gradient(180deg, rgba(32,33,36,.05) 1px, transparent 1px),
@@ -913,6 +915,90 @@ function css() {
     .card-head b {
       color: #356bff;
       font-size: 12px;
+    }
+    .consumer-table-card {
+      overflow: hidden;
+    }
+    .consumer-empty {
+      padding: 5mm;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(53,107,255,.08), rgba(255,173,51,.1));
+      border: 1px solid rgba(53,107,255,.14);
+    }
+    .consumer-empty strong {
+      display: block;
+      margin-bottom: 2mm;
+      font-size: 17px;
+    }
+    .consumer-empty p {
+      margin: 0;
+      color: #665c52;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    .consumer-candidate-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 10.5px;
+    }
+    .consumer-candidate-table th {
+      padding: 2.5mm;
+      color: #7a746d;
+      text-align: left;
+      letter-spacing: .8px;
+      border-bottom: 1px solid rgba(32,33,36,.08);
+    }
+    .consumer-candidate-table td {
+      padding: 3mm 2.5mm;
+      vertical-align: top;
+      border-bottom: 1px solid rgba(32,33,36,.06);
+      line-height: 1.55;
+      word-break: break-word;
+    }
+    .consumer-candidate-table td:first-child { width: 28%; }
+    .consumer-candidate-table strong,
+    .consumer-candidate-table small {
+      display: block;
+    }
+    .consumer-candidate-table small {
+      margin-top: 1mm;
+      color: #7a746d;
+    }
+    .verify-pill {
+      display: inline-block;
+      padding: 1mm 2mm;
+      border-radius: 999px;
+      color: #356bff;
+      font-weight: 900;
+      background: rgba(53,107,255,.08);
+    }
+    .consumer-rank-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 3mm;
+    }
+    .consumer-rank-grid article {
+      padding: 3.5mm;
+      border-radius: 14px;
+      background: #f8f5f1;
+      border: 1px solid rgba(32,33,36,.06);
+    }
+    .consumer-rank-grid b {
+      color: #356bff;
+      font-size: 10px;
+      letter-spacing: 1.2px;
+    }
+    .consumer-rank-grid strong {
+      display: block;
+      margin: 1.5mm 0;
+      font-size: 13px;
+    }
+    .consumer-rank-grid p {
+      margin: 0;
+      color: #665c52;
+      font-size: 10.5px;
+      line-height: 1.55;
     }
     .fact-list, .diff-list, .model-list, .raw-list { display: grid; gap: 3mm; }
     .diff-list { display: block; }
@@ -1138,6 +1224,7 @@ function css() {
       font-size: 12px;
       line-height: 1.7;
     }
+    ${scenarioVisualCss()}
   `;
 }
 

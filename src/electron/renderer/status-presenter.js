@@ -53,7 +53,7 @@
         btnSend.disabled = busy;
         btnSend.classList.toggle('is-busy', !!busy);
       }
-      if (btnCompare) btnCompare.disabled = busy || !deps.isQwenApiOk();
+      if (btnCompare) btnCompare.disabled = busy;
       if (btnReload) btnReload.disabled = busy;
       if (btnSettings) btnSettings.disabled = busy;
     }

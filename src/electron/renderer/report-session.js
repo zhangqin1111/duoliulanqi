@@ -11,6 +11,15 @@
     }
 
     function collectRawReplies() {
+      if (analysisSession && Array.isArray(analysisSession.initialResults) && analysisSession.initialResults.length) {
+        return analysisSession.initialResults.map((reply) => ({
+          id: reply.id,
+          name: reply.name,
+          text: reply.text || '',
+          ok: reply.ok !== false,
+          error: reply.error || '',
+        }));
+      }
       return deps.chatPlatforms().map((cfg) => ({
         id: cfg.id,
         name: cfg.name,

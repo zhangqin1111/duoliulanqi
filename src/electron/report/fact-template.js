@@ -5,7 +5,9 @@ const { renderAuditAppendix } = require('./fact-audit-section');
 const { css } = require('./fact-template-styles');
 const { renderCover } = require('./fact-cover-section');
 const {
+  filterRenderableFacts,
   renderDiffs,
+  renderEvidenceSources,
   renderFactRows,
   renderFunnel,
   renderModels,
@@ -50,6 +52,8 @@ function buildReportHtml(payload, report) {
   const disputeMap = data.dispute_map || {};
   const diagnosis = data.source_diagnosis || {};
   const scenarioDecision = data.scenario_decision || {};
+  const timelineFacts = filterRenderableFacts(factMap.timeline);
+  const confirmedFacts = filterRenderableFacts(factMap.confirmed_facts);
   const profile = getScenarioProfile(meta.task_type || scenarioDecision.task_type);
   const funnel = data.evidence_funnel || {};
   const rawReplies = array(payload && payload.rawReplies);
@@ -126,7 +130,7 @@ function buildReportHtml(payload, report) {
           ${renderScenarioDecision(scenarioDecision, conclusion)}
         </section>
 
-        ${renderUserIssueAnalysis(userIssue, profile)}
+        ${renderUserIssueAnalysis(userIssue, profile, scenarioDecision, conclusion)}
 
         <div class="grid">
           <section class="section-title card--wide">
@@ -137,6 +141,7 @@ function buildReportHtml(payload, report) {
           ${renderFactRows('事实时间轴', factMap.timeline, { weighted: true })}
           ${renderFactRows('多模型确认事实', factMap.confirmed_facts)}
           ${renderFunnel(funnel)}
+          ${renderEvidenceSources(data)}
           ${renderDiffs(disputeMap)}
           <section class="card card--wide">
             <header class="card-head"><span>源头分析与最终裁决</span><b>Verdict</b></header>

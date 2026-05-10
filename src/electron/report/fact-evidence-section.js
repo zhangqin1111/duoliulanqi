@@ -13,11 +13,50 @@ function keyFactItems(items) {
     .slice(0, 4);
 }
 
+const EMPTY_FACT_PATTERNS = [
+  /^未命名事实点$/,
+  /^待核验事实点$/,
+  /^未指定时间\/待核验$/,
+  /^最近\/当前$/,
+  /^待核验$/,
+  /^未标注来源$/,
+  /^unknown$/i,
+  /^pending$/i,
+  /^n\/a$/i,
+];
+
+function isMeaningfulFactText(value) {
+  const out = text(value);
+  if (!out) return false;
+  return !EMPTY_FACT_PATTERNS.some((pattern) => pattern.test(out));
+}
+
+function hasMeaningfulList(value) {
+  return array(value).some((item) => isMeaningfulFactText(item));
+}
+
+function hasRenderableFact(item) {
+  if (!item || typeof item !== 'object') return false;
+  const hasFactBody = isMeaningfulFactText(item.event || item.claim || item.fact || item.title);
+  const hasFactMeta =
+    isMeaningfulFactText(item.time) ||
+    isMeaningfulFactText(item.note) ||
+    hasMeaningfulList(item.sources) ||
+    hasMeaningfulList(item.models);
+  return hasFactBody && hasFactMeta;
+}
+
+function filterRenderableFacts(items) {
+  return array(items).filter(hasRenderableFact);
+}
+
 function renderFactRows(title, items, options = {}) {
-  const list = array(items);
+  const list = filterRenderableFacts(items);
   const important = options.weighted ? keyFactItems(list) : [];
+  if (!list.length && !options.keepEmpty) return '';
+  const cardClass = options.wide || options.weighted ? 'card card--wide' : 'card';
   return `
-    <section class="card">
+    <section class="${cardClass}">
       <header class="card-head">
         <span>${escapeHtml(title)}</span>
         <b>${list.length}</b>
@@ -175,8 +214,63 @@ function renderModels(models) {
   `;
 }
 
+function renderEvidenceSources(report) {
+  const bindings = array(report && report.evidence_bindings).filter((binding) =>
+    isMeaningfulFactText(binding && binding.claim)
+  );
+  const sources = array(report && report.evidence_sources);
+  const summary = report && report.evidence_binding_summary ? report.evidence_binding_summary : {};
+  const byId = new Map(sources.map((item) => [String(item.id || ''), item]));
+  const boundCount = bindings.filter((binding) => array(binding.evidence_ids).length).length;
+  return `
+    <section class="card card--wide">
+      <header class="card-head">
+        <span>证据引用索引</span>
+        <b>${boundCount}/${bindings.length || Number(summary.claims || 0)}</b>
+      </header>
+      <p class="summary-line">强结论必须绑定候选证据；未绑定项统一降级为待核验，避免把模型记忆写成事实。</p>
+      <div class="diff-list">
+        ${
+          bindings.length
+            ? bindings.slice(0, 8).map((binding) => {
+                const evidenceIds = array(binding.evidence_ids);
+                return `
+                  <article class="diff diff--${evidenceIds.length ? 'low' : 'high'}">
+                    <div class="diff-title">
+                      <span>${escapeHtml(text(binding.claim_id, 'C?'))}</span>
+                      <h4>${escapeHtml(clipText(binding.claim, 80))}</h4>
+                      <b>${escapeHtml(text(binding.verification_status, 'needs_verification'))}</b>
+                    </div>
+                    <div class="tags">${renderTags(evidenceIds.length ? evidenceIds : ['待核验'], '待核验')}</div>
+                    ${
+                      evidenceIds.length
+                        ? `<div class="claim-grid">${evidenceIds
+                            .map((id) => {
+                              const src = byId.get(String(id)) || {};
+                              return `
+                                <div class="claim">
+                                  <strong>${escapeHtml(String(id))} · ${escapeHtml(text(src.source, 'source'))}</strong>
+                                  <p>${escapeHtml(clipText(src.title || src.snippet || src.url, 96))}</p>
+                                </div>
+                              `;
+                            })
+                            .join('')}</div>`
+                        : ''
+                    }
+                  </article>
+                `;
+              }).join('')
+            : '<p class="empty">暂无证据引用绑定。</p>'
+        }
+      </div>
+    </section>
+  `;
+}
+
 module.exports = {
+  filterRenderableFacts,
   renderDiffs,
+  renderEvidenceSources,
   renderFactRows,
   renderFunnel,
   renderModels,

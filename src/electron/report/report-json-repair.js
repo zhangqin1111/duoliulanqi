@@ -109,6 +109,7 @@ function buildFallbackReport(payload, source) {
       decision_factors: [{ label: '材料完整度', score: usableReplies.length ? 55 : 30, note: '由可用模型回复数量估算。' }],
       next_questions: ['是否需要重试失败模型？', '是否有权威来源或原始材料可补充？'],
     },
+    scenario_payload: {},
     user_issue_analysis: {
       direct_answer: '当前仅能给出阶段性判断。',
       public_opinion_temperature: 50,

@@ -1,6 +1,7 @@
 'use strict';
 
 const { assertProvider } = require('./provider-contract');
+const { createClaudeProvider } = require('./claude-provider');
 const { createQwenProvider } = require('./qwen-provider');
 const { createOpenAICompatibleProvider } = require('./openai-compatible-provider');
 
@@ -67,6 +68,7 @@ function createProviderRegistry(deps) {
       baseUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
     })
   );
+  register(createClaudeProvider());
 
   return {
     register,

@@ -9,8 +9,8 @@ const LICENSE_FILE = 'license-state.json';
 const CLOCK_ROLLBACK_GRACE_MS = 6 * 60 * 60 * 1000;
 const PUBLIC_KEY_PATH = path.join(__dirname, 'license-public.pem');
 
-function readPublicKey() {
-  return fs.readFileSync(PUBLIC_KEY_PATH, 'utf8');
+function readPublicKey(options = {}) {
+  return options.publicKey || fs.readFileSync(PUBLIC_KEY_PATH, 'utf8');
 }
 
 function stateFilePath() {
@@ -104,7 +104,7 @@ function verifyLicenseToken(token, options = {}) {
   }
 
   try {
-    const verified = crypto.verify(null, payloadBuffer, readPublicKey(), signatureBuffer);
+    const verified = crypto.verify(null, payloadBuffer, readPublicKey(options), signatureBuffer);
     if (!verified) {
       return invalidState('signature', '应用密钥签名校验失败。', raw);
     }
@@ -188,7 +188,9 @@ function assertLicenseValid() {
 
 module.exports = {
   APP_SCOPE,
+  CLOCK_ROLLBACK_GRACE_MS,
   TOKEN_PREFIX,
+  verifyLicenseToken,
   getLicenseState,
   activateLicense,
   clearLicense,

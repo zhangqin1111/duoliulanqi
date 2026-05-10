@@ -40,6 +40,7 @@
     register('career_recruiting', global.DuoliCareerRecruitingWorkflow);
     register('medical_health', global.DuoliMedicalHealthWorkflow);
     register('finance_planning', global.DuoliFinancePlanningWorkflow);
+    register('general_compare', global.DuoliGeneralCompareWorkflow);
 
     return {
       register,

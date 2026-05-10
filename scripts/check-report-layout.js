@@ -16,8 +16,13 @@ function main() {
     return;
   }
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  if (!Array.isArray(manifest) || manifest.length < 6) {
-    fail('Expected at least 6 rendered report fixtures.');
+  if (!Array.isArray(manifest) || manifest.length < 15) {
+    fail('Expected at least 15 rendered report fixtures.');
+    return;
+  }
+  const taskTypes = new Set(manifest.map((item) => item.taskType).filter(Boolean));
+  if (taskTypes.size < 15) {
+    fail(`Expected rendered fixtures to cover 15 task types, got ${taskTypes.size}.`);
     return;
   }
 

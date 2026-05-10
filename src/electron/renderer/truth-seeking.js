@@ -343,10 +343,63 @@
         },
         { timeoutMs: 240000, retries: 1 }
       );
+      if (!r.ok && global.DuoliProviderCompletion && typeof global.DuoliProviderCompletion.streamText === 'function') {
+        accumulated = '';
+        const fallback = await global.DuoliProviderCompletion.streamText(
+          api,
+          prompts().buildFinalTracePrompt(
+            question,
+            modelReplies,
+            session.diffAnalyses,
+            session.pollution,
+            session.originalQuestion,
+            session.selfCleansing,
+            session.taskRoute,
+            session.highRisk,
+            session.evidencePlan,
+            session.evidencePack
+          ),
+          (delta) => {
+            accumulated += delta;
+            if (summaryBodyEl) {
+              summaryBodyEl.textContent = core().renderFinalAnalysisText(accumulated, session);
+              refreshComparePanel();
+              summaryBodyEl.scrollTop = summaryBodyEl.scrollHeight;
+            }
+          },
+          { timeoutMs: 240000, retries: 1, preferQwen: false }
+        );
+        if (fallback && fallback.ok) {
+          r.ok = true;
+          r.text = fallback.text || accumulated;
+        } else {
+          r.error = (fallback && fallback.error) || r.error;
+        }
+      }
       if (!r.ok) {
         throw new Error(r.error || '最终裁决生成失败。');
       }
       session.finalText = (accumulated || r.text || '').trim();
+      if (
+        global.DuoliReportCompletenessOrchestrator &&
+        typeof global.DuoliReportCompletenessOrchestrator.completeFinalReport === 'function'
+      ) {
+        if (typeof deps.setFlowStage === 'function') {
+          deps.setFlowStage('report', '正在做专业完整度审计', '正在检查场景 JSON、用户答案、证据口径和报告可执行性。', 'active');
+        }
+        const completion = await global.DuoliReportCompletenessOrchestrator.completeFinalReport({
+          api,
+          core: core(),
+          session,
+          finalText: session.finalText,
+        });
+        session.finalText = completion.text;
+        session.reportCompleteness = {
+          audit: completion.audit,
+          completed: completion.completed,
+          checkedAt: new Date().toISOString(),
+        };
+      }
       setSession(session);
       if (typeof deps.completeFlowStage === 'function') {
         deps.completeFlowStage('report', '最终报告已生成，可以打开对比弹层查看完整内容。');

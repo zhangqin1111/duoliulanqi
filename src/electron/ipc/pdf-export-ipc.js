@@ -5,6 +5,9 @@ const os = require('os');
 const path = require('path');
 const { repairStructuredReport } = require('../report/report-json-repair');
 const { applyHighRiskPolicy } = require('../report/high-risk-report-policy');
+const { bindEvidenceToReport } = require('../evidence/evidence-claim-linker');
+const { enrichReportOutcome } = require('../report/report-outcome-enricher');
+const { applyReportQualityGate } = require('../report/report-quality-gate');
 
 const REPORT_BASENAME = '滤镜·多源大模型内容对比分析';
 
@@ -80,9 +83,14 @@ function registerPdfExportIpc({ ipcMain, app, BrowserWindow, dialog, getMainWind
     if (canceled || !filePath) return { ok: false, error: 'canceled' };
 
     const repaired = repairStructuredReport(payload);
-    const structured = applyHighRiskPolicy(
+    const structuredWithPolicy = applyHighRiskPolicy(
       repaired.structured,
       payload && payload.analysisSession ? payload.analysisSession.highRisk : null
+    );
+    const structured = applyReportQualityGate(
+      enrichReportOutcome(
+        bindEvidenceToReport(structuredWithPolicy, payload && payload.analysisSession ? payload.analysisSession.evidencePack : null)
+      )
     );
     const html = reportTemplateRegistry.buildReportHtml(payload, structured);
     const tmpHtml = path.join(os.tmpdir(), `duoli_pdf_${Date.now()}.html`);

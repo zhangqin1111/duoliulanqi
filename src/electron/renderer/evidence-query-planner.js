@@ -13,7 +13,7 @@
       queries.push(`${q} 官方 价格 参数`);
       queries.push(`${q} 评测 对比 缺点`);
     } else if (type === 'public_opinion') {
-      queries.push(`${q} 最新 舆情 热搜`);
+      queries.push(`${q} 舆情 热搜 来源`);
       queries.push(`${q} 官方回应 媒体报道`);
     } else if (type === 'fact_check') {
       queries.push(`${q} 官方 辟谣`);
@@ -26,7 +26,7 @@
       queries.push(`${q} 风险 注意事项`);
     } else {
       queries.push(`${q} 官方 来源`);
-      queries.push(`${q} 最新 信息`);
+      queries.push(`${q} 公开 信息 来源`);
     }
 
     return {

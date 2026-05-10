@@ -20,6 +20,12 @@ assert(budget.maxModels >= 4, 'high value task should allow more models');
 const config = loadRemoteConfig('');
 assert(config.highRiskRules.enabled, 'default remote config should enable high-risk rules');
 
+const rendererRoot = path.join(__dirname, '..', 'src', 'electron', 'renderer');
+const indexHtml = fs.readFileSync(path.join(rendererRoot, 'index.html'), 'utf8');
+const workflowRegistry = fs.readFileSync(path.join(rendererRoot, 'workflow-registry.js'), 'utf8');
+assert(indexHtml.includes('workflows/general-compare-workflow.js'), 'general compare workflow script must be loaded');
+assert(workflowRegistry.includes("register('general_compare'"), 'general compare workflow must be registered');
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'duoli_commercial_'));
 const history = createReportHistoryStore(path.join(tmp, 'history.json'));
 const item = history.add({ question: '测试报告', taskType: 'consumer_purchase', status: 'exported' });

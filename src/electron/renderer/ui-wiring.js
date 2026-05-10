@@ -257,7 +257,8 @@
           deps.guestLoaded.delete(cfg.id);
           deps.setColStatus(cfg.id, '重新加载中…', '');
         });
-        if (!deps.chatPlatforms().length) {
+        const apiOnlyMode = !deps.chatPlatforms().length;
+        if (apiOnlyMode) {
           deps.setStatus('当前没有可刷新的 AI 工具。');
           return;
         }
@@ -394,7 +395,8 @@
           qEl.focus();
           return;
         }
-        if (!deps.chatPlatforms().length) {
+        const apiOnlyMode = !deps.chatPlatforms().length;
+        if (apiOnlyMode && typeof deps.runConcurrentAsk !== 'function') {
           deps.setStatus('请先恢复至少一个 AI 工具。');
           return;
         }
@@ -428,7 +430,7 @@
           if (typeof deps.completeFlowStage === 'function') {
             deps.completeFlowStage('dispatch', '多模型回复已收集，开始进入结构化分析。');
           }
-          if (deps.getAutoSummarizeAfterSend() && deps.isQwenApiOk()) {
+          if (deps.getAutoSummarizeAfterSend()) {
             deps.setSummaryStatus('三站已有结果，正在自动生成结构化对比…');
             await deps.runCompareAndSummarize(dispatch, { results, originalQuestion: raw, taskRoute });
             deps.setStatus('发送完成，并已生成结构化对比。');
@@ -459,11 +461,11 @@
           qEl.focus();
           return;
         }
-        if (!deps.isQwenApiOk()) {
+        if (false && !deps.isQwenApiOk()) {
           deps.setStatus('未配置 DashScope API Key，当前无法使用对比。');
           return;
         }
-        if (!deps.chatPlatforms().length) {
+        if (!deps.chatPlatforms().length && typeof deps.runConcurrentAsk !== 'function') {
           deps.setStatus('请先恢复至少一个 AI 工具。');
           return;
         }
@@ -487,7 +489,11 @@
           if (typeof deps.setFlowStage === 'function') {
             deps.setFlowStage('dispatch', '正在分发给多个 AI', '多个 AI 正在并行作答，系统会等待回复稳定后再进入分析。', 'active');
           }
-          await deps.runCompareAndSummarize(dispatch, { originalQuestion: raw, taskRoute });
+          let apiOnlyResults = null;
+          if (!deps.chatPlatforms().length) {
+            apiOnlyResults = await deps.runConcurrentAsk(dispatch);
+          }
+          await deps.runCompareAndSummarize(dispatch, { results: apiOnlyResults, originalQuestion: raw, taskRoute });
           deps.setStatus('对比流程已完成。');
         } catch (e) {
           if (e && e.flowStage === 'refine') {

@@ -239,6 +239,19 @@
       });
     }
 
+    function apiOnlyAnalysisRunner() {
+      return controller('apiOnlyAnalysisRunner', {
+        moduleName: 'DuoliApiOnlyAnalysisRunner',
+        factoryName: 'createApiOnlyAnalysisRunner',
+        label: 'API-only analysis runner',
+        createDeps: () => ({
+          getApi: ctx.getApi,
+          setFlowStage: ctx.actions.setFlowStage,
+          setSummaryStatus: ctx.actions.setSummaryStatus,
+        }),
+      });
+    }
+
     function embedBounds() {
       return controller('embedBounds', {
         moduleName: 'DuoliEmbedBounds',
@@ -361,6 +374,7 @@
     return {
       aiConversation,
       analysisOrchestrator,
+      apiOnlyAnalysisRunner,
       chatFlowPresenter,
       comparePanel,
       composerPresenter,
