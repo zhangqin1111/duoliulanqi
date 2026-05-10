@@ -56,6 +56,38 @@ async function main() {
   assert(result.completed === true, 'completion should run for incomplete JSON');
   assert(result.audit.ok, 'completed report should pass audit');
   assert(result.text.includes('"candidate_table"'), 'completed JSON should replace original block');
+
+  const incompleteOpinion = {
+    meta: { task_type: 'public_opinion', question_original: '某人最近舆论怎么样' },
+    executive_conclusion: { one_sentence: '缺少舆情结构' },
+    scenario_decision: { task_type: 'public_opinion', direct_verdict: '待核验', recommended_action: '补齐舆情结构' },
+    scenario_payload: {},
+    question_brief: {},
+    user_issue_analysis: {},
+    fact_map: {},
+    dispute_map: {},
+    evidence_funnel: {},
+    model_profiles: [],
+    source_diagnosis: {},
+    final_actions: [],
+  };
+  const deterministic = await orchestrator.completeFinalReport({
+    api: {},
+    session: {
+      taskType: 'public_opinion',
+      question: '某人最近舆论怎么样',
+      initialResults: [{ cfg: { id: 'kimi', name: 'Kimi' }, r: { ok: true, text: '没有足够来源，需要核验。' } }],
+    },
+    finalText: `report\n\n\`\`\`json\n${JSON.stringify(incompleteOpinion)}\n\`\`\``,
+    core: {
+      async qwenJson() {
+        return incompleteOpinion;
+      },
+    },
+  });
+  assert(deterministic.audit.ok, 'deterministic completion should repair missing public opinion payload');
+  assert(deterministic.structured.scenario_payload.signal_matrix.length, 'signal_matrix should be generated as audit gap');
+  assert(deterministic.completedBy === 'deterministic_after_incomplete_model', 'incomplete model completion should be marked');
   console.log('Report completeness orchestrator check passed');
 }
 

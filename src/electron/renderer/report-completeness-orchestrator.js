@@ -131,26 +131,56 @@
     return `${source.slice(0, last.start).trim()}${jsonBlock}${source.slice(last.end)}`;
   }
 
+  function repairApi() {
+    if (root.DuoliReportCompletenessRepair) return root.DuoliReportCompletenessRepair;
+    if (typeof require === 'function') return require('./report-completeness-repair');
+    return null;
+  }
+
   async function completeFinalReport({ api, core, session, finalText }) {
     const report = extractStructuredReport(finalText);
     const audit = auditStructuredReport(report, session);
     if (audit.ok) return { text: finalText, structured: report, audit, completed: false };
-    if (!core || typeof core.qwenJson !== 'function') {
-      throw new Error(`报告 JSON 不完整，且缺少补齐引擎：${audit.missingPayloadKeys.join(', ') || audit.missingTopLevel.join(', ')}`);
+    let completed = null;
+    let completedBy = 'model';
+    if (core && typeof core.qwenJson === 'function') {
+      try {
+        const prompt = buildCompletionPrompt({ session, finalText, report, audit });
+        completed = await core.qwenJson(api, prompt, report || {}, { timeoutMs: 180000, retries: 1, preferQwen: false });
+      } catch (error) {
+        completed = null;
+        completedBy = 'deterministic_after_model_error';
+      }
     }
-    const prompt = buildCompletionPrompt({ session, finalText, report, audit });
-    const completed = await core.qwenJson(api, prompt, report || {}, { timeoutMs: 180000, retries: 1, preferQwen: false });
-    const completedAudit = auditStructuredReport(completed, session);
+    let completedAudit = auditStructuredReport(completed, session);
     if (!completedAudit.ok) {
-      throw new Error(
-        `报告质量补齐失败，仍缺少：${[...completedAudit.missingTopLevel, ...completedAudit.missingPayloadKeys].join(', ')}`
-      );
+      const repair = repairApi();
+      if (!repair || typeof repair.completeMissingFieldsDeterministically !== 'function') {
+        throw new Error(
+          `报告质量补齐失败，仍缺少：${[...completedAudit.missingTopLevel, ...completedAudit.missingPayloadKeys].join(', ')}`
+        );
+      }
+      completed = repair.completeMissingFieldsDeterministically(completed || report || {}, session, completedAudit);
+      completedBy = completedBy === 'model' ? 'deterministic_after_incomplete_model' : completedBy;
+      completedAudit = auditStructuredReport(completed, session);
+    }
+    if (!completedAudit.ok) {
+      const repair = repairApi();
+      if (!repair || typeof repair.completeMissingFieldsDeterministically !== 'function') {
+        throw new Error(
+          `报告质量补齐失败，仍缺少：${[...completedAudit.missingTopLevel, ...completedAudit.missingPayloadKeys].join(', ')}`
+        );
+      }
+      completed = repair.completeMissingFieldsDeterministically(completed || {}, session, completedAudit);
+      completedBy = 'deterministic_final_repair';
+      completedAudit = auditStructuredReport(completed, session);
     }
     return {
       text: replaceStructuredJson(finalText, completed),
       structured: completed,
       audit: completedAudit,
       completed: true,
+      completedBy,
     };
   }
 
