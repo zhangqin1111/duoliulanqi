@@ -12,6 +12,42 @@
     return Array.isArray(value) ? value : [];
   }
 
+  function scoreValue(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(0, Math.min(100, Math.round(number)));
+  }
+
+  function isBlockedQualityGate(report) {
+    return report && report.quality_gate && report.quality_gate.level === 'blocked';
+  }
+
+  function unsafeBlockedConclusion(conclusion) {
+    const sentence = String((conclusion && conclusion.one_sentence) || '');
+    return (
+      scoreValue(conclusion && conclusion.confidence_score) > 58 ||
+      /(无任何可验证|均为AI幻觉|AI幻觉虚构|不构成真实舆情事件|不存在真实舆情|无需响应|不需要响应)/.test(sentence)
+    );
+  }
+
+  function displayConclusion(report) {
+    const conclusion = (report && report.executive_conclusion) || {};
+    if (!isBlockedQualityGate(report) || !unsafeBlockedConclusion(conclusion)) return conclusion;
+    const decision = (report && report.scenario_decision) || {};
+    const meta = (report && report.meta) || {};
+    const target = decision.decision_object || meta.question_original || '该问题';
+    return {
+      ...conclusion,
+      status: 'insufficient',
+      confidence_score: Math.min(scoreValue(conclusion.confidence_score), 58),
+      confidence_label: '证据不足，需核验',
+      risk_level: conclusion.risk_level || 'medium',
+      one_sentence: `当前材料不足以证明“${target}”存在可验证的新发或复发关键事件；请先补齐原始来源、权威回应和传播节点后再裁决。`,
+      core_tension: '质量门禁已阻断强裁决：模型文本存在结论性表达，但证据绑定不足。',
+      largest_uncertainty: '缺少可追溯的一手信源与交叉验证证据。',
+    };
+  }
+
   function statusLabel(status) {
     const map = {
       strong: '强结论',
@@ -243,7 +279,7 @@
   }
 
   function renderReport(report, rawReplies) {
-    const conclusion = report.executive_conclusion || {};
+    const conclusion = displayConclusion(report);
     const brief = report.question_brief || {};
     const factMap = report.fact_map || {};
     const disputeMap = report.dispute_map || {};

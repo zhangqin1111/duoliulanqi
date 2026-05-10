@@ -42,16 +42,45 @@ function renderBriefingMap(profile) {
   `;
 }
 
+function isBlockedQualityGate(data) {
+  return data && data.quality_gate && data.quality_gate.level === 'blocked';
+}
+
+function unsafeBlockedConclusion(conclusion) {
+  const sentence = text(conclusion && conclusion.one_sentence, '');
+  const confidence = score(conclusion && conclusion.confidence_score);
+  return (
+    confidence > 58 ||
+    /(无任何可验证|均为AI幻觉|AI幻觉虚构|不构成真实舆情事件|不存在真实舆情|无需响应|不需要响应)/.test(sentence)
+  );
+}
+
+function displayConclusionForTemplate(data, conclusion, scenarioDecision) {
+  if (!isBlockedQualityGate(data) || !unsafeBlockedConclusion(conclusion)) return conclusion;
+  const decisionObject = text(scenarioDecision && scenarioDecision.decision_object, text(data.meta && data.meta.question_original, '该问题'));
+  return {
+    ...(conclusion || {}),
+    status: 'insufficient',
+    confidence_score: Math.min(score(conclusion && conclusion.confidence_score), 58),
+    confidence_label: '证据不足，需核验',
+    risk_level: text(conclusion && conclusion.risk_level, 'medium'),
+    one_sentence: `当前材料不足以证明“${decisionObject}”存在可验证的新发或复发关键事件；请先补齐原始来源、权威回应和传播节点后再裁决。`,
+    core_tension: '质量门禁已阻断强裁决：模型文本存在结论性表达，但证据绑定不足。',
+    largest_uncertainty: '缺少可追溯的一手信源与交叉验证证据。',
+  };
+}
+
 function buildReportHtml(payload, report) {
   const data = report || {};
   const meta = data.meta || {};
-  const conclusion = data.executive_conclusion || {};
+  const rawConclusion = data.executive_conclusion || {};
   const userIssue = data.user_issue_analysis || {};
   const brief = data.question_brief || {};
   const factMap = data.fact_map || {};
   const disputeMap = data.dispute_map || {};
   const diagnosis = data.source_diagnosis || {};
   const scenarioDecision = data.scenario_decision || {};
+  const conclusion = displayConclusionForTemplate(data, rawConclusion, scenarioDecision);
   const timelineFacts = filterRenderableFacts(factMap.timeline);
   const confirmedFacts = filterRenderableFacts(factMap.confirmed_facts);
   const profile = getScenarioProfile(meta.task_type || scenarioDecision.task_type);
