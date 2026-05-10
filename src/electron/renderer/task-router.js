@@ -211,6 +211,18 @@
     if (/(对.*影响|影响.*行业|利好|利空|产业链|政策.*影响)/.test(question)) {
       hints.push('investment_research');
     }
+    if (
+      /(\u8206\u8bba|\u8206\u60c5|\u70ed\u699c|\u70ed\u641c|\u7f51\u53cb|\u5a92\u4f53|\u516c\u5171\u8ba8\u8bba|\u4fe1\u7528|\u58f0\u8a89|\u56de\u5e94|\u8206\u60c5\u4f5c\u7528)/.test(question) &&
+      /(\u94f6\u884c|\u50a8\u6237|\u5b58\u6b3e|\u5458\u5de5|\u8f6c\u8d70|\u53f8\u6cd5|\u8d23\u4efb|\u98ce\u63a7|\u4e8b\u4ef6|\u6848\u4f8b)/.test(question)
+    ) {
+      hints.push('public_opinion');
+    }
+    if (
+      /(\u5546\u4e1a\u94f6\u884c\u6cd5|\u6cd5\u5f8b|\u53f8\u6cd5|\u8d23\u4efb|\u5408\u540c|\u8d54\u507f|\u4fb5\u6743)/.test(question) &&
+      /(\u94f6\u884c|\u50a8\u6237|\u5b58\u6b3e|\u5458\u5de5|\u8f6c\u8d70)/.test(question)
+    ) {
+      hints.push('legal_risk');
+    }
     return hints;
   }
 

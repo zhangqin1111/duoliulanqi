@@ -19,7 +19,7 @@ function loadBrowserScript(file, sandbox) {
 }
 
 function buildSandbox() {
-  const sandbox = { window: {}, console };
+  const sandbox = { window: {}, console, setTimeout, clearTimeout };
   sandbox.globalThis = sandbox.window;
   loadBrowserScript('question-refinement-policy.js', sandbox);
   loadBrowserScript('workflow-registry.js', sandbox);
@@ -73,7 +73,36 @@ function checkConsumerRefinePrompt(refiner) {
   }
 }
 
-function main() {
+async function checkLongSourceMaterialRefine(sandbox, refiner) {
+  const longMaterial = [
+    '储户千万存款失踪，银行称需等待司法结论。两位储户合计1800万存款被银行员工转走，后续本息返还。',
+    '材料包含银行风控、员工个人行为、商业银行法、舆论压力、储户信任、类似案例、媒体建议和公众质疑。',
+    '用户希望系统围绕这段材料做事实核验、舆情研判、责任边界和风险分析，而不是把长材料误判为空问题。',
+  ].join('');
+  const raw = longMaterial.repeat(8);
+  const prompt = refiner.buildRefinePrompt(raw, { task_type: 'public_opinion' });
+  if (!prompt || prompt.length <= raw.length) {
+    fail('Long source material must be accepted and wrapped as an analysis task prompt.');
+  }
+
+  sandbox.window.DuoliProviderCompletion = {
+    completeText: async () => ({
+      ok: true,
+      text: '请围绕用户提供的银行存款被转走舆情材料，执行事实核验、舆情研判、银行责任边界、信息污染剔除和后续核验行动分析；区分可核验事实、待核验说法、观点情绪与法律责任争议，不得擅自新增材料外事实。',
+      source: 'test',
+    }),
+  };
+  const instance = refiner.createQuestionRefiner({
+    getApi: () => ({}),
+    timeoutMs: 1000,
+  });
+  const result = await instance.refineQuestion(raw, { taskRoute: { task_type: 'public_opinion' } });
+  if (!result || !result.refined || !result.refined.includes('银行存款')) {
+    fail('Long source material refinement should return a dispatchable analysis task.');
+  }
+}
+
+async function main() {
   const sandbox = buildSandbox();
   const policy = sandbox.window.DuoliQuestionRefinementPolicy;
   const refiner = sandbox.window.DuoliQuestionRefiner;
@@ -84,10 +113,13 @@ function main() {
 
   checkTimeBoundaryPolicy(policy);
   checkConsumerRefinePrompt(refiner);
+  await checkLongSourceMaterialRefine(sandbox, refiner);
 
   if (!process.exitCode) {
     console.log('Question refinement policy check passed');
   }
 }
 
-main();
+main().catch((error) => {
+  fail(error && error.stack ? error.stack : String(error));
+});
