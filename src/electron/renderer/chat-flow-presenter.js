@@ -30,6 +30,9 @@
     function revealFlow() {
       const emptyEl = getEmptyEl();
       if (emptyEl) emptyEl.hidden = true;
+      // 添加 has-content 类以启用滚动条显示
+      const threadScrollEl = document.getElementById('thread-scroll');
+      if (threadScrollEl) threadScrollEl.classList.add('has-content');
     }
 
     function reset() {
@@ -38,6 +41,9 @@
       stageNodes.clear();
       const emptyEl = getEmptyEl();
       if (emptyEl) emptyEl.hidden = false;
+      // 移除 has-content 类以隐藏滚动条
+      const threadScrollEl = document.getElementById('thread-scroll');
+      if (threadScrollEl) threadScrollEl.classList.remove('has-content');
     }
 
     function appendUserMessage(text) {
