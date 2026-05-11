@@ -352,17 +352,44 @@
       return route;
     }
 
+    function collapseRepeatedQuestionText(raw) {
+      const text = String(raw || '').trim();
+      if (text.length < 12) return text;
+      const compact = text.replace(/\s+/g, '');
+      for (let unitLen = 4; unitLen <= Math.floor(compact.length / 2); unitLen++) {
+        if (compact.length % unitLen !== 0) continue;
+        const unit = compact.slice(0, unitLen);
+        const repeats = compact.length / unitLen;
+        if (repeats < 2) continue;
+        if (unit.repeat(repeats) === compact) return unit;
+      }
+      const sentenceParts = text.match(/[^。！？!?；;]+[。！？!?；;]?/g);
+      if (!sentenceParts || sentenceParts.length < 2) return text;
+      const collapsed = [];
+      sentenceParts.forEach((part) => {
+        const current = String(part || '').trim();
+        if (!current) return;
+        const previous = collapsed[collapsed.length - 1] || '';
+        if (current.replace(/\s+/g, '') !== previous.replace(/\s+/g, '')) collapsed.push(current);
+      });
+      return collapsed.join('');
+    }
+
     async function resolveRefinedQuestion(raw, taskRoute) {
       if (typeof deps.getAiRefineEnabled === 'function' && !deps.getAiRefineEnabled()) {
+        const collapsed = collapseRepeatedQuestionText(raw);
         if (typeof deps.completeFlowStage === 'function') {
-          deps.completeFlowStage('refine', '已关闭 AI 补全，直接使用客户原始输入。');
+          deps.completeFlowStage(
+            'refine',
+            collapsed === raw ? '已关闭 AI 补全，直接使用客户原始输入。' : '已关闭 AI 补全，已移除连续重复输入后发送。'
+          );
         }
-        deps.setStatus('已关闭 AI 补全，直接使用原始问题。');
+        deps.setStatus(collapsed === raw ? '已关闭 AI 补全，直接使用原始问题。' : '已关闭 AI 补全，已移除连续重复输入。');
         return {
-          refined: raw,
+          refined: collapsed,
           original: raw,
           fellBack: true,
-          reason: 'ai-refine-disabled',
+          reason: collapsed === raw ? 'ai-refine-disabled' : 'ai-refine-disabled-deduped',
           source: 'user-original',
         };
       }

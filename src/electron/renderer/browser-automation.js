@@ -51,6 +51,19 @@ function buildFillScript(text, cfg) {
       try { el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Process', bubbles: true })); } catch (e7) {}
       try { el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true })); } catch (e8) {}
     }
+    function forceExactText(el, val) {
+      if (!el) return;
+      if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+        if ((el.value || '') !== val) nativeValueSetter(el, val);
+        return;
+      }
+      if (el.isContentEditable || el.getAttribute('role') === 'textbox') {
+        var current = (el.innerText || el.textContent || '');
+        if (current !== val) {
+          try { el.textContent = val; } catch (e0) {}
+        }
+      }
+    }
     function pickLargestVisibleTextarea() {
       var best = null;
       var bestArea = 0;
@@ -189,13 +202,16 @@ function buildFillScript(text, cfg) {
       try { document.execCommand('insertText', false, text); } catch (e3) {}
       nativeValueSetter(el, text);
       dispatchSyncEvents(el, text);
+      forceExactText(el, text);
       if (syncInputAggressive) {
         await sleep(80);
         dispatchSyncEvents(el, text);
+        forceExactText(el, text);
         try { el.blur(); } catch (e4) {}
         await sleep(40);
         el.focus();
         dispatchSyncEvents(el, text);
+        forceExactText(el, text);
       }
     } else if (el.isContentEditable || el.getAttribute('role') === 'textbox') {
       try { el.innerHTML = ''; } catch (e5) {}
@@ -203,6 +219,7 @@ function buildFillScript(text, cfg) {
       try { document.execCommand('insertText', false, text); } catch (e6) {}
       try { el.textContent = text; } catch (e7) {}
       dispatchSyncEvents(el, text);
+      forceExactText(el, text);
     } else {
       throw new Error('无法写入输入框');
     }

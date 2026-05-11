@@ -36,6 +36,45 @@
       return best;
     }
 
+    function normalizeForEchoCompare(text) {
+      return String(text || '').replace(/\s+/g, '');
+    }
+
+    function collapseExactRepeatForCompare(text) {
+      const compact = normalizeForEchoCompare(text);
+      if (compact.length < 12) return compact;
+      for (let unitLen = 4; unitLen <= Math.floor(compact.length / 2); unitLen++) {
+        if (compact.length % unitLen !== 0) continue;
+        const unit = compact.slice(0, unitLen);
+        if (unit.repeat(compact.length / unitLen) === compact) return unit;
+      }
+      return compact;
+    }
+
+    function stripQuestionEcho(replyText, question) {
+      const raw = String(replyText || '').trim();
+      const questionKey = normalizeForEchoCompare(question);
+      if (!raw || questionKey.length < 6) return raw;
+      const questionUnit = collapseExactRepeatForCompare(questionKey);
+      const lines = raw
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      let start = 0;
+      while (start < lines.length) {
+        const line = lines[start];
+        const key = normalizeForEchoCompare(line);
+        const isControl = /^(编辑|复制|分享|重新生成|喜欢|不喜欢|举报|更多)$/.test(line);
+        const isQuestionEcho =
+          key === questionKey ||
+          key === questionUnit ||
+          (key.length >= 6 && (questionKey.includes(key) || (questionUnit && questionUnit.includes(key))));
+        if (!isControl && !isQuestionEcho) break;
+        start += 1;
+      }
+      return lines.slice(start).join('\n').trim() || raw;
+    }
+
     function buildExtractScript(selectors, minLen) {
       return `(function() {
         var sels = ${JSON.stringify(selectors)};
@@ -246,10 +285,11 @@
                   : minQuietAfterFirstReplyMs,
             }
           );
-          if (!text || !isPlausibleReplyText(text)) {
+          const cleanedText = stripQuestionEcho(text, question);
+          if (!cleanedText || !isPlausibleReplyText(cleanedText)) {
             throw new Error('未抓到有效回复（选择器可能已变）');
           }
-          return { ok: true, text: text.trim() };
+          return { ok: true, text: cleanedText.trim() };
         } catch (e) {
           lastErr = e && e.message ? e.message : String(e);
         }
