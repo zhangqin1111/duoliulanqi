@@ -353,6 +353,19 @@
     }
 
     async function resolveRefinedQuestion(raw, taskRoute) {
+      if (typeof deps.getAiRefineEnabled === 'function' && !deps.getAiRefineEnabled()) {
+        if (typeof deps.completeFlowStage === 'function') {
+          deps.completeFlowStage('refine', '已关闭 AI 补全，直接使用客户原始输入。');
+        }
+        deps.setStatus('已关闭 AI 补全，直接使用原始问题。');
+        return {
+          refined: raw,
+          original: raw,
+          fellBack: true,
+          reason: 'ai-refine-disabled',
+          source: 'user-original',
+        };
+      }
       if (typeof deps.refineQuestion !== 'function') {
         throw new Error('问题补全模块不可用，无法进入多模型分发。');
       }

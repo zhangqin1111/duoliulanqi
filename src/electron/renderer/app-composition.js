@@ -204,6 +204,7 @@
         factoryName: 'createUserPreferences',
         label: 'User preferences',
         createDeps: () => ({
+          getAiRefineCheckbox: () => document.getElementById('chk-ai-refine'),
           getAutoSummarizeCheckbox: () => document.getElementById('chk-auto-summarize'),
           getReplyIdleCheckbox: () => document.getElementById('chk-reply-idle'),
         }),

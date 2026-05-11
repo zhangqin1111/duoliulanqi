@@ -51,6 +51,11 @@
                 </div>
               </div>
               <div class="toolbar-actions">
+                <label class="top-toggle" for="chk-ai-refine" title="关闭后将直接使用客户原文，不再让 AI 改写或补全问题">
+                  <input id="chk-ai-refine" type="checkbox" />
+                  <span class="top-toggle__track" aria-hidden="true"></span>
+                  <span class="top-toggle__label">AI 补全</span>
+                </label>
                 <button type="button" id="btnViewMode" class="toolbar-btn toolbar-btn--view">显示调试视图</button>
                 <button type="button" id="btnReload" class="toolbar-btn">一键刷新</button>
                 <button type="button" id="btnSettings" class="toolbar-btn">API 设置</button>
@@ -122,7 +127,7 @@
                 <section id="chat-empty" class="chat-empty" aria-label="欢迎提示">
                   <div class="chat-empty__orb" aria-hidden="true"><span></span></div>
                   <h2>你好，你想知道的我都有</h2>
-                  <p>输入一个问题，我会自动补全、分发给多个 AI、追问差异并生成对比报告。</p>
+                  <p>输入一个问题，我会按顶部开关决定是否补全，然后分发给多个 AI、追问差异并生成对比报告。</p>
                 </section>
                 <div id="chat-flow" class="chat-flow" aria-live="polite"></div>
 

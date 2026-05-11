@@ -1,6 +1,6 @@
 const path = require('path');
 const fs = require('fs');
-const { app, BrowserWindow, BrowserView, ipcMain, dialog, screen } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, dialog, screen, Menu } = require('electron');
 const platforms = require('../config/platforms');
 const {
   getQwenKeyStatus,
@@ -78,6 +78,17 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    if (!params || !params.isEditable) return;
+    Menu.buildFromTemplate([
+      { role: 'cut', label: '剪切' },
+      { role: 'copy', label: '复制' },
+      { role: 'paste', label: '粘贴' },
+      { type: 'separator' },
+      { role: 'selectAll', label: '全选' },
+    ]).popup({ window: mainWindow });
+  });
 
   mainWindow.webContents.once('did-finish-load', () => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.maximize();

@@ -126,6 +126,7 @@ function getAppComposition() {
         ensureWorkbenchBoot,
         failFlowStage,
         getAutoSummarizeAfterSend,
+        getAiRefineEnabled,
         getDifferenceText,
         getReplyStableIdleMs,
         handleRecoveryAction,
@@ -417,6 +418,10 @@ function getAutoSummarizeAfterSend() {
   return getUserPreferences().getAutoSummarizeAfterSend();
 }
 
+function getAiRefineEnabled() {
+  return getUserPreferences().getAiRefineEnabled();
+}
+
 function getAiConversationController() {
   return getAppComposition().aiConversation();
 }
@@ -511,6 +516,7 @@ function getUiWiring() {
 }
 
 function wireUi() {
+  getUserPreferences();
   getUiWiring().wire();
 }
 
