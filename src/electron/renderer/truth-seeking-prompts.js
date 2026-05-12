@@ -10,6 +10,19 @@
     return registry && typeof registry.resolve === 'function' ? registry.resolve(taskRoute) : null;
   }
 
+  function appendFollowupSearchProtocol(prompt) {
+    return [
+      String(prompt || '').trim(),
+      '',
+      '# 联网核验协议（追问阶段强制）',
+      '请搜索网络最新的信息来核验本轮差异，再回答。不要只凭记忆回答。',
+      '请搜索网络最新公开资料，重点搜索：官方口径、发布时间、价格/参数/公告/声明/报道、最新售卖状态或事件进展。',
+      '搜索完成后再说明：哪些信息被最新网络资料确认，哪些仍无法确认，哪些只是模型记忆或推理。',
+      '如果你无法搜索网络、无法联网、没有搜索入口或搜索失败，必须在回答开头明确写出：“未联网，仅基于已有知识判断”。',
+      '未搜索网络或无法联网时，不得把任何最新事实、价格、发布时间、售卖状态、事件进展写成确定事实。',
+    ].filter(Boolean).join('\n');
+  }
+
   function buildDiffExtractPrompt(question, modelReplies, taskRoute) {
     const workflow = resolveWorkflow(taskRoute);
     if (workflow && typeof workflow.buildDiffExtractPrompt === 'function') {
@@ -53,9 +66,9 @@
   function buildDiffFollowupQuestion(question, diff, round, taskRoute) {
     const workflow = resolveWorkflow(taskRoute);
     if (workflow && typeof workflow.buildDiffFollowupQuestion === 'function') {
-      return workflow.buildDiffFollowupQuestion({ question, diff, round, taskRoute });
+      return appendFollowupSearchProtocol(workflow.buildDiffFollowupQuestion({ question, diff, round, taskRoute }));
     }
-    return [
+    return appendFollowupSearchProtocol([
       `原始问题：${question}`,
       '',
       `现在多个 AI 在「${diff.topic}」上出现不一致。`,
@@ -68,7 +81,7 @@
       '请只回答“为什么不一致”，不要重新回答原始问题。',
       '必须区分以下原因：事实来源不同、时间点不同、问题口径不同、推理链不同、安全策略或平台限制、AI 幻觉或无证据推测、只是表达不同。',
       '最后给出你认为最可能的差异源头，以及应该剔除哪些污染因素。',
-    ].join('\n');
+    ].join('\n'));
   }
 
   function buildSecondMergePrompt(question, diff, followupRounds) {
@@ -203,7 +216,21 @@
     ].join('\n');
   }
 
-  function buildFinalTracePrompt(question, modelReplies, diffAnalyses, pollution, originalQuestion, selfCleansing, taskRoute, highRisk, evidencePlan, evidencePack) {
+  function buildFinalTracePrompt(
+    question,
+    modelReplies,
+    diffAnalyses,
+    pollution,
+    originalQuestion,
+    selfCleansing,
+    taskRoute,
+    highRisk,
+    evidencePlan,
+    evidencePack,
+    evidenceBoundaryGuard,
+    externalEvidenceEnabled,
+    consensus
+  ) {
     const compressor = global.DuoliReportMaterialCompressor;
     const compact =
       compressor && typeof compressor.compactFinalTraceInput === 'function'
@@ -218,6 +245,9 @@
             highRisk,
             evidencePlan,
             evidencePack,
+            evidenceBoundaryGuard,
+            externalEvidenceEnabled,
+            consensus,
           })
         : {
             question,
@@ -230,6 +260,9 @@
             highRisk,
             evidencePlan,
             evidencePack,
+            evidenceBoundaryGuard,
+            externalEvidenceEnabled,
+            consensus,
           };
     const api = global.DuoliEvaluationReportPrompt;
     if (api && typeof api.buildEvaluationReportPrompt === 'function') {
@@ -244,6 +277,9 @@
         highRisk: compact.highRisk,
         evidencePlan: compact.evidencePlan,
         evidencePack: compact.evidencePack,
+        evidenceBoundaryGuard: compact.evidenceBoundaryGuard,
+        externalEvidenceEnabled: compact.externalEvidenceEnabled,
+        consensus: compact.consensus,
       });
     }
     return [

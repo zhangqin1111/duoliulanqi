@@ -341,7 +341,7 @@
               <b>剔除污染后的判断</b>
               <p>${escapeHtml(diagnosis.retained_judgment || conclusion.one_sentence)}</p>
               <b>下一步</b>
-              <div class="intel-tags">${renderTags(report.final_actions, '继续外部核验')}</div>
+              <div class="intel-tags">${renderTags(report.final_actions, '继续AI交叉复核')}</div>
             </div>
           </section>
           ${renderRawReplies(rawReplies)}

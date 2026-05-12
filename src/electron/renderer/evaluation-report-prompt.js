@@ -37,6 +37,7 @@
     const diffAnalyses = data.diffAnalyses ? JSON.stringify(data.diffAnalyses, null, 2) : '[]';
     const pollution = data.pollution ? JSON.stringify(data.pollution, null, 2) : '{}';
     const selfCleansing = data.selfCleansing ? JSON.stringify(data.selfCleansing, null, 2) : 'null';
+    const consensus = data.consensus ? JSON.stringify(data.consensus, null, 2) : 'null';
     const taskRoute = data.taskRoute || {};
     const taskLabel = taskRoute.label || taskRoute.task_type || '通用多源对比';
     const taskWorkflow = taskRoute.recommended_workflow || 'general_compare_workflow';
@@ -44,6 +45,8 @@
     const highRisk = data.highRisk || {};
     const evidencePlan = data.evidencePlan || {};
     const evidencePack = data.evidencePack || {};
+    const evidenceBoundaryGuard = data.evidenceBoundaryGuard || {};
+    const externalEvidenceEnabled = data.externalEvidenceEnabled === true;
     const workflowRegistry = global.DuoliWorkflowRegistry;
     const workflow =
       workflowRegistry && typeof workflowRegistry.resolve === 'function' ? workflowRegistry.resolve(taskRoute) : null;
@@ -69,6 +72,12 @@
       '5. 所有量化指标必须给出 0-100 分或整数数量；若依据不足，用保守估算，但不可假装精确测量。',
       '6. 用户没有明确日期时，不得替用户补具体年份、月份、日期、起止时间或“最新/当前”等事实前提；只能要求各模型标注资料时效、可核验/待核验状态。用户给了明确日期时，严格使用用户日期。',
       '6.1 如果是消费选购或同系列机型对比，不能因为模型未附官网 URL、知识截止较早、或缺少发布会/开发者文档证据，就直接判定用户指定产品不存在；应把这类问题写成信息缺口，并继续围绕用户指定系列给出条件化对比和待核验项。',
+      externalEvidenceEnabled
+        ? '6.2 如果证据层未返回有效来源，严禁写“官方不存在”“无权威信源”“虚构信源”“全部为幻觉”“全部不可采信”等否定式强裁决。只能写成：AI 交叉一致/冲突 + 证据不足；除非输入材料本身包含可核验反证。'
+        : '6.2 当前版本未开启外部来源接入：报告不得把“外部核验/可信来源/权威搜索”作为结论门槛，也不得反复要求外部核验；必须基于多 AI 回答、差异追问、污染剔除和模型一致性给出阶段性裁决。',
+      externalEvidenceEnabled
+        ? '6.3 多个模型独立给出同一官方口径型主张（如外交部/新华社/官网/公告/发言人）时，即使没有外部搜索，也不能把它直接剔除为污染；必须保留为高优先级待证据增强主张。'
+        : '6.3 多个模型独立给出同一官方口径型主张时，不要因为没有外部来源就剔除为污染；应按“多模型一致主张”纳入判断，并说明依据来自 AI 交叉研判。',
       '7. 语言要像咨询公司 + 舆情情报室 + AI 实验室联合出品：极度精炼、专业、高信息密度，优先使用“结构化失配”“信息能见度赤字”“证据链收敛”“污染剔除”“模型证人”等术语。',
       '8. 写法必须是“裁决式”，不是“解释式”：优先短句、强判断、少铺垫。每个核心页面都要让老板 30 秒内知道有没有事件、要不要响应、下一步做什么。',
       highRisk && highRisk.highRisk
@@ -81,6 +90,9 @@
       workflowReportAddon ? `13. 场景化报告规则：${workflowReportAddon}` : '',
       actionContractAddon ? `13.1 场景可执行答案硬约束：${actionContractAddon}` : '',
     ];
+    lines.push(
+      'Consensus voting rule: prefer repeated independent multi-model agreement; keep evidence-backed minority only as an unverified candidate; downweight isolated unsupported claims and never let them dominate final verdict.'
+    );
     if (wasRefined) {
       lines.push(
         '14. 用户原始提问与系统补全后的下发问题不一致：必须说明补全是否影响了模型回答和最终判断。'
@@ -143,7 +155,7 @@
       taskRoute.reason ? `识别理由：${taskRoute.reason}` : '',
       taskRoute.risk_note ? `风险提示：${taskRoute.risk_note}` : ''
     );
-    if (evidencePlan && Array.isArray(evidencePlan.queries) && evidencePlan.queries.length) {
+    if (externalEvidenceEnabled && evidencePlan && Array.isArray(evidencePlan.queries) && evidencePlan.queries.length) {
       lines.push(
         '',
         '# 待核验证据查询计划',
@@ -151,7 +163,18 @@
         ...evidencePlan.queries.map((query) => `- ${query}`)
       );
     }
-    if (evidencePack && Array.isArray(evidencePack.items) && evidencePack.items.length) {
+    if (externalEvidenceEnabled && evidenceBoundaryGuard && evidenceBoundaryGuard.applied) {
+      lines.push(
+        '',
+        '# 证据边界守门结果',
+        '系统检测到外部证据层未接入或未返回来源。以下规则优先级高于模型自审、污染剔除和多数投票：',
+        '1. 不得把“未接入外部证据”写成“官方不存在/虚构信源”。',
+        '2. 对官方口径型主张只能标注“待外部核验”，不能直接裁为污染。',
+        '3. 若模型间冲突，报告应输出核验路径和暂定判断，不得输出反向强裁决。',
+        JSON.stringify(evidenceBoundaryGuard, null, 2)
+      );
+    }
+    if (externalEvidenceEnabled && evidencePack && Array.isArray(evidencePack.items) && evidencePack.items.length) {
       lines.push(
         '',
         '# 已检索候选证据',
@@ -163,7 +186,7 @@
           return `- ${title}｜${source}｜可信度 ${item.credibility || 0}｜${snippet}`;
         })
       );
-    } else if (evidencePack && evidencePack.error) {
+    } else if (externalEvidenceEnabled && evidencePack && evidencePack.error) {
       lines.push('', '# 证据检索状态', `证据检索失败或未配置：${evidencePack.error}`);
     }
     if (wasRefined) {
@@ -185,6 +208,10 @@
       '',
       '# 差异追问与二次合并结果',
       diffAnalyses,
+      '',
+      '# 模型投票与少数派降权结果',
+      '说明: 系统已按“多数共识优先、少数有证据保留、孤立无证据降权”的规则生成 consensus。最终报告必须优先使用 majority；downweighted 不得进入最终裁决；minority_candidates 只能作为待观察候选。',
+      consensus,
       '',
       '# 污染剔除结果(千问初判)',
       pollution,

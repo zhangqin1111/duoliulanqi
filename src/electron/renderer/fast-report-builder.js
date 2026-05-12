@@ -44,7 +44,7 @@
   }
 
   function buildScenarioPayload(taskType, session) {
-    const pending = '待专业完整版补齐/外部核验';
+    const pending = '待专业完整版补齐/AI交叉复核';
     const commonClaim = {
       label: '已收集多模型材料',
       value: okReplies(session).length,
@@ -153,13 +153,13 @@
         direct_verdict: direct,
         recommended_action: '先查看初稿判断方向，等待完整版完成后再导出 PDF 或对外使用。',
         evidence_standard: '快版仅依据本次多模型回答、差异追问和污染剔除中已形成的结构化材料。',
-        do_not_overread: ['不要把初稿当作最终裁决', '不要把 AI 证词当作外部可信来源'],
+        do_not_overread: ['不要把初稿当作最终裁决', '不要把 AI 证词伪装成外部来源'],
         decision_factors: diffs.map((diff, index) => ({
           label: safeText(diff.topic, `差异 ${index + 1}`),
           score: diff.severity === 'high' ? 80 : diff.severity === 'low' ? 45 : 60,
           note: safeText(diff.why_it_matters, '影响最终判断'),
         })),
-        next_questions: ['等待完整报告生成', '如涉及事实/法律/价格/医疗/金融结论，继续外部核验'],
+        next_questions: ['等待完整报告生成', '如涉及事实/法律/价格/医疗/金融结论，继续做 AI 交叉复核'],
       },
       scenario_payload: buildScenarioPayload(taskType, session),
       question_brief: {
@@ -184,7 +184,7 @@
           probability: 55,
           mitigation: '等待完整版归因和核验路径',
         })),
-        blindspots: ['外部可信来源尚未接入或尚未完成核验'],
+        blindspots: ['当前版本按多 AI 交叉研判输出，未启用外部来源模块'],
       },
       fact_map: {
         timeline: [],
@@ -255,7 +255,7 @@
         pollution_factors: pollution,
         retained_judgment: direct,
       },
-      final_actions: ['等待专业完整版完成', '完整版完成后再导出 PDF', '对关键事实继续外部核验'],
+      final_actions: ['等待专业完整版完成', '完整版完成后再导出 PDF', '对关键事实继续做 AI 交叉复核'],
     };
   }
 

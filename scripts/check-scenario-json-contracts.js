@@ -125,11 +125,11 @@ function checkAiAnalysisOnlyPublicOpinionVerdict() {
   const sentence = String(conclusion.one_sentence || '');
   const problems = [];
 
-  if (!gated.quality_gate || gated.quality_gate.level !== 'ai_analysis_only') {
-    problems.push('AI cross-analysis report should be usable as ai_analysis_only');
+  if (!gated.quality_gate || gated.quality_gate.level !== 'ai_cross_analysis_pass') {
+    problems.push('AI cross-analysis report should pass as ai_cross_analysis_pass');
   }
-  if (Number(conclusion.confidence_score) > 72) {
-    problems.push('AI-only confidence must be capped');
+  if (Number(conclusion.confidence_score) < 65 || Number(conclusion.confidence_score) > 88) {
+    problems.push('AI cross-analysis confidence should stay in product confidence band');
   }
   if (/无需响应|已核验|可核验/.test(sentence + conclusion.confidence_label)) {
     problems.push('AI-only report must not claim verified/no-action certainty');

@@ -36,6 +36,12 @@
       return best;
     }
 
+    function createReplyError(code, message) {
+      const error = new Error(message);
+      error.code = code;
+      return error;
+    }
+
     function normalizeForEchoCompare(text) {
       return String(text || '').replace(/\s+/g, '');
     }
@@ -49,6 +55,26 @@
         if (unit.repeat(compact.length / unitLen) === compact) return unit;
       }
       return compact;
+    }
+
+    function isMeaningfullyDifferentReply(text, baseSnippet) {
+      const current = normalizeForEchoCompare(text);
+      const base = normalizeForEchoCompare(baseSnippet);
+      if (!current) return false;
+      if (!base) return true;
+      if (current === base) return false;
+      if (current.includes(base) && current.length > base.length + 6) return true;
+      if (base.includes(current) && current.length < base.length * 0.98) return false;
+      return true;
+    }
+
+    function pickNewestChangedPlausible(candidates, baseSnippet) {
+      if (!Array.isArray(candidates)) return '';
+      for (const text of candidates) {
+        if (!isPlausibleReplyText(text)) continue;
+        if (isMeaningfullyDifferentReply(text, baseSnippet)) return text;
+      }
+      return pickFirstPlausible(candidates) || '';
     }
 
     function stripQuestionEcho(replyText, question) {
@@ -188,11 +214,16 @@
           ? stableOpts.minQuietAfterFirstReplyMs
           : minQuietAfterFirstReplyMs;
       const minStable = (stableOpts && stableOpts.minStableChars) || 14;
+      const noResponseTimeoutMs =
+        stableOpts && typeof stableOpts.noResponseTimeoutMs === 'number' && stableOpts.noResponseTimeoutMs > 0
+          ? stableOpts.noResponseTimeoutMs
+          : 0;
       const baseSnippet = String(snippetBefore || '');
       let stableStr = null;
       let stableSince = 0;
       let firstGrowthAt = null;
-      let lastLen = baseSnippet.length;
+      let lastLen = 0;
+      const startedAt = Date.now();
       const deadline = Date.now() + timeoutMs;
       let lastDom = snippetBefore || '';
       while (Date.now() < deadline) {
@@ -203,13 +234,13 @@
           const hit = extractMatchesCompareFormat(candidates, hints);
           if (hit && !isActive) return hit;
         }
-        const dom = pickFirstPlausible(candidates) || '';
+        const dom = pickNewestChangedPlausible(candidates, baseSnippet) || '';
         const domLen = dom.length;
+        const hasNewReply = isMeaningfullyDifferentReply(dom, baseSnippet);
         if (idleMs > 0 && dom && isPlausibleReplyText(dom) && dom.length >= minStable) {
-          const grown = dom.length > baseSnippet.length + 6 || (baseSnippet.length < 10 && dom !== baseSnippet);
-          if (grown) {
+          if (hasNewReply) {
             if (!firstGrowthAt) firstGrowthAt = Date.now();
-            if (domLen > lastLen) {
+            if (dom !== stableStr) {
               lastLen = domLen;
               stableStr = dom;
               stableSince = Date.now();
@@ -226,7 +257,18 @@
         } else {
           stableStr = null;
         }
-        const domGrew = dom && dom.length > (lastDom?.length || 0) + 8;
+        if (
+          noResponseTimeoutMs > 0 &&
+          !firstGrowthAt &&
+          Date.now() - startedAt >= noResponseTimeoutMs &&
+          !isActive
+        ) {
+          throw createReplyError('no_response', `未检测到新回复（${Math.round(noResponseTimeoutMs / 1000)}秒）`);
+        }
+        const domGrew =
+          dom &&
+          hasNewReply &&
+          (dom.length > (lastDom?.length || 0) + 8 || normalizeForEchoCompare(dom) !== normalizeForEchoCompare(lastDom));
         if (domGrew) {
           lastDom = dom;
           if (dom.length > lastLen) lastLen = dom.length;
@@ -239,7 +281,7 @@
             const hit2 = extractMatchesCompareFormat(c2, hints);
             if (hit2 && !(activity2 && activity2.active)) return hit2;
           }
-          const dom2 = pickFirstPlausible(c2) || '';
+          const dom2 = pickNewestChangedPlausible(c2, baseSnippet) || '';
           const best = dom2.length >= dom.length ? dom2 : dom;
           if (isPlausibleReplyText(best) && !(activity2 && activity2.active)) return best.trim();
         }
@@ -250,7 +292,11 @@
         const hit = extractMatchesCompareFormat(tail, hints);
         if (hit) return hit;
       }
-      return (await extractPlausible(id, responseSelectors, 12)).trim();
+      const finalText = pickNewestChangedPlausible(tail, baseSnippet) || (await extractPlausible(id, responseSelectors, 12));
+      if (!isMeaningfullyDifferentReply(finalText, baseSnippet)) {
+        throw createReplyError('timeout', `等待回复超时（${Math.round(timeoutMs / 1000)}秒）`);
+      }
+      return finalText.trim();
     }
 
     async function askOnePlatform(cfg, question, opts) {
@@ -279,6 +325,7 @@
             {
               replyStableIdleMs,
               minStableChars: options.minStableChars ?? 14,
+              noResponseTimeoutMs: options.noResponseTimeoutMs,
               minQuietAfterFirstReplyMs:
                 typeof options.minQuietAfterFirstReplyMs === 'number'
                   ? options.minQuietAfterFirstReplyMs
@@ -292,6 +339,7 @@
           return { ok: true, text: cleanedText.trim() };
         } catch (e) {
           lastErr = e && e.message ? e.message : String(e);
+          if (e && e.code) return { ok: false, code: e.code, error: lastErr };
         }
       }
       return { ok: false, error: lastErr };
@@ -319,11 +367,21 @@
             deps.setColStatus(cfg.id, '正在写入并等待回复…', '');
             r = await askOnePlatform(cfg, question, {
               replyStableIdleMs: idleMs,
-              responseTimeoutMs,
+              responseTimeoutMs: Number(cfg.responseTimeoutMs) || responseTimeoutMs,
+              noResponseTimeoutMs: Number(cfg.noResponseTimeoutMs) || 0,
+              minQuietAfterFirstReplyMs: Number(cfg.minQuietAfterFirstReplyMs) || undefined,
               retries: 0,
             });
           } catch (error) {
             r = { ok: false, error: error && error.message ? error.message : String(error) };
+          }
+          if (!r.ok && r.code === 'no_response') {
+            deps.setColStatus(cfg.id, `未完成：${r.error || '未检测到新回复'}`, 'err');
+            return { cfg, r };
+          }
+          if (!r.ok) {
+            deps.setColStatus(cfg.id, `超时/错误：${r.error || ''}`, 'err');
+            return { cfg, r };
           }
           if (r.ok) {
             deps.setColStatus(cfg.id, '完成', 'ok');

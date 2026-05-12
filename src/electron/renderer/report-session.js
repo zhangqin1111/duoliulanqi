@@ -35,6 +35,10 @@
         summaryText: deps.getSummaryText(),
         rawReplies: collectRawReplies(),
         analysisSession,
+        structuredReport:
+          analysisSession && analysisSession.structuredReport && typeof analysisSession.structuredReport === 'object'
+            ? analysisSession.structuredReport
+            : null,
       });
     }
 

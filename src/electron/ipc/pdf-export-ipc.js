@@ -76,7 +76,8 @@ function prepareStructuredReport(payload = {}) {
   const structured = applyReportQualityGate(
     enrichReportOutcome(
       bindEvidenceToReport(structuredWithPolicy, payload && payload.analysisSession ? payload.analysisSession.evidencePack : null)
-    )
+    ),
+    { analysisSession: payload && payload.analysisSession ? payload.analysisSession : null }
   );
   return { repaired, structured };
 }

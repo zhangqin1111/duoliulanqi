@@ -95,6 +95,55 @@
     };
   }
 
+  function compactConsensus(consensus) {
+    if (!consensus || typeof consensus !== 'object') return null;
+    return {
+      strategy: consensus.strategy || '',
+      model_count: consensus.model_count || 0,
+      majority_threshold: consensus.majority_threshold || 0,
+      rule_summary: clip(consensus.rule_summary, 520),
+      downweighted_models: Array.isArray(consensus.downweighted_models) ? consensus.downweighted_models.slice(0, 8) : [],
+      model_profiles: Array.isArray(consensus.model_profiles)
+        ? consensus.model_profiles.slice(0, 8).map((profile) => ({
+            model: profile.model || '',
+            consensus_score: profile.consensus_score || 0,
+            vote_role: profile.vote_role || '',
+          }))
+        : [],
+      analyses: Array.isArray(consensus.analyses)
+        ? consensus.analyses.slice(0, 8).map((item) => ({
+            diff_id: item.diff_id || '',
+            topic: clip(item.topic, 220),
+            type: item.type || '',
+            status: item.status || '',
+            decision_rule: item.decision_rule || '',
+            majority: item.majority
+              ? {
+                  representative: clip(item.majority.representative, 360),
+                  support: item.majority.support || 0,
+                  models: Array.isArray(item.majority.models) ? item.majority.models : [],
+                }
+              : null,
+            downweighted: Array.isArray(item.downweighted)
+              ? item.downweighted.slice(0, 5).map((claim) => ({
+                  representative: clip(claim.representative, 280),
+                  models: Array.isArray(claim.models) ? claim.models : [],
+                  reason: claim.reason || '',
+                }))
+              : [],
+            minority_candidates: Array.isArray(item.minority_candidates)
+              ? item.minority_candidates.slice(0, 5).map((claim) => ({
+                  representative: clip(claim.representative, 280),
+                  support: claim.support || 0,
+                  models: Array.isArray(claim.models) ? claim.models : [],
+                  reason: claim.reason || '',
+                }))
+              : [],
+          }))
+        : [],
+    };
+  }
+
   function compactFinalTraceInput(input) {
     const source = input || {};
     return {
@@ -108,6 +157,9 @@
       highRisk: source.highRisk || null,
       evidencePlan: source.evidencePlan || null,
       evidencePack: source.evidencePack || null,
+      evidenceBoundaryGuard: source.evidenceBoundaryGuard || null,
+      externalEvidenceEnabled: source.externalEvidenceEnabled === true,
+      consensus: compactConsensus(source.consensus),
     };
   }
 
@@ -115,6 +167,7 @@
     clip,
     compactDiffAnalyses,
     compactFinalTraceInput,
+    compactConsensus,
     compactPollution,
     compactReplies,
     compactSelfCleansing,

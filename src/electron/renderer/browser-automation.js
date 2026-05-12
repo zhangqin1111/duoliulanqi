@@ -6,6 +6,7 @@ function buildFillScript(text, cfg) {
     useComposerSubmit: !!cfg.useComposerSubmit,
     syncInputAggressive: !!cfg.syncInputAggressive,
     strictInputSync: !!cfg.strictInputSync,
+    exactInputOnly: !!cfg.exactInputOnly,
     minimalSubmitClicks: !!cfg.minimalSubmitClicks,
     submitViaEnter: !!cfg.submitViaEnter,
     preSubmitDelayMs: Math.max(0, Number(cfg.preSubmitDelayMs) || 0),
@@ -17,6 +18,7 @@ function buildFillScript(text, cfg) {
     var useComposerSubmit = ${JSON.stringify(meta.useComposerSubmit)};
     var syncInputAggressive = ${JSON.stringify(meta.syncInputAggressive)};
     var strictInputSync = ${JSON.stringify(meta.strictInputSync)};
+    var exactInputOnly = ${JSON.stringify(meta.exactInputOnly)};
     var minimalSubmitClicks = ${JSON.stringify(meta.minimalSubmitClicks)};
     var submitViaEnter = ${JSON.stringify(meta.submitViaEnter)};
     var preSubmitDelayMs = ${JSON.stringify(meta.preSubmitDelayMs)};
@@ -44,9 +46,10 @@ function buildFillScript(text, cfg) {
       return false;
     }
     function dispatchSyncEvents(el, val) {
-      if (strictInputSync) {
+      if (strictInputSync || exactInputOnly) {
         try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e0) {}
         try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e00) {}
+        try { el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: val })); } catch (e000) {}
         return;
       }
       try { el.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: val })); } catch (e1) {}
@@ -69,6 +72,34 @@ function buildFillScript(text, cfg) {
         if (current !== val) {
           try { el.textContent = val; } catch (e0) {}
         }
+      }
+    }
+    function normalizeForCompare(val) {
+      return String(val || '').replace(/\\s+/g, '');
+    }
+    function isRepeatedText(current, expected) {
+      var compactCurrent = normalizeForCompare(current);
+      var compactExpected = normalizeForCompare(expected);
+      if (!compactCurrent || !compactExpected) return false;
+      if (compactCurrent === compactExpected) return false;
+      if (compactCurrent.length % compactExpected.length !== 0) return false;
+      return compactExpected.repeat(compactCurrent.length / compactExpected.length) === compactCurrent;
+    }
+    function clearEditable(el) {
+      if (!el) return;
+      if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+        nativeValueSetter(el, '');
+        return;
+      }
+      if (el.isContentEditable || el.getAttribute('role') === 'textbox') {
+        el.focus();
+        selectEditableContents(el);
+        try { el.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'deleteContentBackward', data: null })); } catch (e00) {}
+        try { document.execCommand('delete', false, null); } catch (e0) {}
+        try { el.innerHTML = ''; } catch (e1) {}
+        try { el.textContent = ''; } catch (e2) {}
+        try { el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward', data: null })); } catch (e3) {}
+        try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e4) {}
       }
     }
     function readInputText(el) {
@@ -94,12 +125,32 @@ function buildFillScript(text, cfg) {
         dispatchSyncEvents(el, val);
         return;
       }
+      if (exactInputOnly) {
+        writeExactEditableText(el, val);
+        return;
+      }
       try { document.execCommand('insertText', false, val); } catch (e0) {}
       dispatchSyncEvents(el, val);
       if ((readInputText(el) || '').replace(/\\s+/g, '') !== String(val || '').replace(/\\s+/g, '')) {
         try { el.textContent = val; } catch (e1) {}
         dispatchSyncEvents(el, val);
       }
+    }
+    function writeExactEditableText(el, val) {
+      if (!el) return;
+      clearEditable(el);
+      awaitMicrotaskSafeFocus(el);
+      try { document.execCommand('insertText', false, val); } catch (e0) {}
+      dispatchSyncEvents(el, val);
+      if (normalizeForCompare(readInputText(el)) !== normalizeForCompare(val)) {
+        clearEditable(el);
+        try { el.textContent = val; } catch (e1) {}
+        dispatchSyncEvents(el, val);
+      }
+    }
+    function awaitMicrotaskSafeFocus(el) {
+      try { el.focus(); } catch (e0) {}
+      selectEditableContents(el);
     }
     function pickLargestVisibleTextarea() {
       var best = null;
@@ -260,18 +311,36 @@ function buildFillScript(text, cfg) {
       await sleep(50);
       insertTextOnce(el, text);
     } else if (el.isContentEditable || el.getAttribute('role') === 'textbox') {
-      try { el.innerHTML = ''; } catch (e5) {}
-      el.focus();
-      if (!strictInputSync) {
-        try { document.execCommand('insertText', false, text); } catch (e6) {}
+      if (exactInputOnly) {
+        writeExactEditableText(el, text);
+      } else {
+        clearEditable(el);
+        el.focus();
+        if (!strictInputSync) {
+          try { document.execCommand('insertText', false, text); } catch (e6) {}
+        }
+        try { el.textContent = text; } catch (e7) {}
+        dispatchSyncEvents(el, text);
+        forceExactText(el, text);
       }
-      try { el.textContent = text; } catch (e7) {}
-      dispatchSyncEvents(el, text);
-      forceExactText(el, text);
     } else {
       throw new Error('无法写入输入框');
     }
     await sleep(260 + Math.floor(Math.random() * 180) + preSubmitDelayMs);
+    if (isRepeatedText(readInputText(el), text)) {
+      if (exactInputOnly && (el.isContentEditable || el.getAttribute('role') === 'textbox')) {
+        writeExactEditableText(el, text);
+      } else {
+        forceExactText(el, text);
+        dispatchSyncEvents(el, text);
+      }
+      await sleep(80);
+      if (isRepeatedText(readInputText(el), text)) {
+        clearEditable(el);
+        try { document.execCommand('insertText', false, text); } catch (e6) {}
+        dispatchSyncEvents(el, text);
+      }
+    }
     function doSubmit() {
       if (useComposerSubmit && tryClickComposerSend(el)) return true;
       if (tryClickConfigured()) return true;

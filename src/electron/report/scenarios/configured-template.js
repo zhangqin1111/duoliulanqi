@@ -220,7 +220,7 @@ function renderReadinessPanel(report, config) {
           <article>
             <span>Evidence Binding</span>
             <strong>${escapeHtml(`${evidence.bound}/${evidence.claims || evidence.bound}`)}</strong>
-            <p>${escapeHtml(evidence.evidenceSources ? `${evidence.evidenceSources} 个来源进入复核链` : '暂无外部证据源，禁止写成强事实')}</p>
+            <p>${escapeHtml(evidence.evidenceSources ? `${evidence.evidenceSources} 个来源进入复核链` : '当前按多 AI 交叉研判输出，未启用外部来源模块')}</p>
           </article>
           <article>
             <span>Missing Keys</span>

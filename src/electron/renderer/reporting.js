@@ -137,7 +137,7 @@
     const taskRoute =
       data.taskRoute ||
       (data.analysisSession && data.analysisSession.taskRoute ? data.analysisSession.taskRoute : null);
-    const structuredReport = extractStructuredReport(summaryText, {
+    const fallbackStructuredReport = {
       question: String(data.questionText || '').trim(),
       originalQuestion:
         data.analysisSession && data.analysisSession.originalQuestion
@@ -145,7 +145,17 @@
           : '',
       taskRoute,
       taskType: taskRoute && taskRoute.task_type ? taskRoute.task_type : 'general_compare',
-    });
+    };
+    const sessionStructuredReport =
+      data.analysisSession &&
+      data.analysisSession.structuredReport &&
+      typeof data.analysisSession.structuredReport === 'object'
+        ? data.analysisSession.structuredReport
+        : null;
+    const structuredReport =
+      data.structuredReport && typeof data.structuredReport === 'object'
+        ? data.structuredReport
+        : sessionStructuredReport || extractStructuredReport(summaryText, fallbackStructuredReport);
     const evaluation = {
       globalSummary: getSection(sections, '全局摘要：多模型能力全景与核心矛盾'),
       executiveDashboard: getSection(sections, '战情驾驶舱'),

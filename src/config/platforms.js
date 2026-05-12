@@ -57,6 +57,9 @@ module.exports = [
     avatarFg: '#3167df',
   }, {
     strictInputSync: true,
+    responseTimeoutMs: 75000,
+    noResponseTimeoutMs: 28000,
+    minQuietAfterFirstReplyMs: 9000,
   }),
   platform('doubao', 'Doubao', 'https://www.doubao.com/', {
     avatar: 'D',
@@ -90,9 +93,13 @@ module.exports = [
       submitViaEnter: false,
       useComposerSubmit: true,
       syncInputAggressive: true,
+      exactInputOnly: true,
       minimalSubmitClicks: false,
       preSubmitDelayMs: 900,
       settleMs: 2800,
+      responseTimeoutMs: 75000,
+      noResponseTimeoutMs: 28000,
+      minQuietAfterFirstReplyMs: 9000,
       inputSelectors: [
         'textarea[placeholder*="输入"]',
         'textarea[placeholder*="问"]',

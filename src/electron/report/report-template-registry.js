@@ -53,7 +53,9 @@ function resolveTemplate(structured) {
 }
 
 function buildReportHtml(payload, structured) {
-  const enriched = applyReportQualityGate(enrichReportOutcome(structured));
+  const enriched = applyReportQualityGate(enrichReportOutcome(structured), {
+    analysisSession: payload && payload.analysisSession ? payload.analysisSession : null,
+  });
   return resolveTemplate(enriched).buildReportHtml(payload, enriched);
 }
 

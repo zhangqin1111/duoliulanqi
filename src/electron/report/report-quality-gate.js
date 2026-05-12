@@ -121,6 +121,82 @@ function scrubCrossScenarioResidue(value, context) {
   return value;
 }
 
+function isExternalEvidenceEnabled(context) {
+  const session = context && (context.analysisSession || context.session);
+  return !!(context && context.externalEvidenceEnabled === true) || !!(session && session.externalEvidenceEnabled === true);
+}
+
+function scrubDisabledExternalEvidenceCopy(value) {
+  if (typeof value === 'string') {
+    return value
+      .replace(/待外部核验/g, '待AI交叉复核')
+      .replace(/外部核验/g, 'AI交叉复核')
+      .replace(/外部可信来源/g, '多模型来源')
+      .replace(/可信来源/g, '模型来源')
+      .replace(/权威来源/g, '高可信模型共识')
+      .replace(/权威信源/g, '高可信模型共识')
+      .replace(/搜索\/官方\/媒体源/g, '多模型回答')
+      .replace(/搜索接口/g, '外部来源模块')
+      .replace(/官方\/主流渠道证据/g, '多模型一致材料')
+      .replace(/后续接入可信来源后/g, '后续开启外部来源模块后')
+      .replace(/后续如接入可信来源/g, '后续如开启外部来源模块')
+      .replace(/尚未接入/g, '当前未启用')
+      .replace(/未接入/g, '未启用')
+      .replace(/已接入多模型来源/g, '已启用外部来源模块')
+      .replace(/待后续模型来源增强/g, '来自 AI 模型')
+      .replace(/第一版暂以 AI 交叉研判为准；后续开启外部来源模块后可升级为外部证据裁决。/g, '当前按 AI 交叉研判输出可用结论。')
+      .replace(/后续开启外部来源模块后再升级为可核验裁决。/g, '当前按 AI 交叉研判输出可用结论。');
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map(scrubDisabledExternalEvidenceCopy)
+      .filter((item) => !(typeof item === 'string' && /补齐至少\s*3\s*个|可信来源|外部来源|外部证据/.test(item)));
+  }
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [key, child] of Object.entries(value)) out[key] = scrubDisabledExternalEvidenceCopy(child);
+    return out;
+  }
+  return value;
+}
+
+function normalizeAiOnlyActionList(value) {
+  const externalActionRe = /(官网|官方网站|新华社|白宫|外交部|权威|可信来源|外部来源|外部证据|信源交叉核验|原始文件索引|搜索|检索接口)/;
+  const list = array(value)
+    .map((item) => (typeof item === 'string' ? scrubDisabledExternalEvidenceCopy(item) : item))
+    .filter((item) => !(typeof item === 'string' && externalActionRe.test(item)));
+  if (!list.some((item) => typeof item === 'string' && /AI|多模型|交叉/.test(item))) {
+    list.push('按多 AI 一致性、差异追问和污染剔除结果复核关键判断。');
+  }
+  return list;
+}
+
+function applyDisabledExternalEvidencePolicy(report) {
+  const cleaned = scrubDisabledExternalEvidenceCopy(report);
+  cleaned.evidence_binding_summary = {
+    ...((cleaned && cleaned.evidence_binding_summary) || {}),
+    analysis_basis: 'ai_cross_analysis',
+    external_sources_connected: false,
+    external_evidence_enabled: false,
+  };
+  cleaned.quality_gate = {
+    ...((cleaned && cleaned.quality_gate) || {}),
+    external_evidence_enabled: false,
+    evidence_policy: 'ai_cross_analysis_only',
+  };
+  cleaned.final_actions = normalizeAiOnlyActionList(cleaned.final_actions);
+  if (cleaned.scenario_decision && typeof cleaned.scenario_decision === 'object') {
+    cleaned.scenario_decision.next_questions = normalizeAiOnlyActionList(cleaned.scenario_decision.next_questions);
+    cleaned.scenario_decision.do_not_overread = normalizeAiOnlyActionList(cleaned.scenario_decision.do_not_overread);
+  }
+  if (cleaned.scenario_payload && typeof cleaned.scenario_payload === 'object') {
+    cleaned.scenario_payload.manual_verification_items = normalizeAiOnlyActionList(
+      cleaned.scenario_payload.manual_verification_items
+    );
+  }
+  return cleaned;
+}
+
 function userQuestionText(report) {
   const meta = (report && report.meta) || {};
   const brief = (report && report.question_brief) || {};
@@ -151,11 +227,25 @@ function needsPublicOpinionDowngrade(report, summary) {
 }
 
 function hasAiAnalysisBasis(report) {
+  const metaModels = array(report && report.meta && report.meta.models);
   const modelProfiles = array(report && report.model_profiles);
   const disputes = array(report && report.dispute_map && report.dispute_map.items);
   const rootCauses = array(report && report.source_diagnosis && report.source_diagnosis.root_causes);
   const retained = text(report && report.source_diagnosis && report.source_diagnosis.retained_judgment);
-  return modelProfiles.length >= 2 && disputes.length >= 1 && (rootCauses.length >= 1 || retained.length >= 16);
+  const conclusion = text(report && report.executive_conclusion && report.executive_conclusion.one_sentence);
+  const directAnswer = text(report && report.user_issue_analysis && report.user_issue_analysis.direct_answer);
+  const modelCount = Math.max(metaModels.length, modelProfiles.length);
+  const hasModelConsensusMaterial = modelCount >= 2 && (conclusion.length >= 18 || directAnswer.length >= 24);
+  const hasClosedLoopMaterial = disputes.length >= 1 && (rootCauses.length >= 1 || retained.length >= 16);
+  return hasModelConsensusMaterial || (modelProfiles.length >= 2 && hasClosedLoopMaterial);
+}
+
+function hasSessionAiBasis(context) {
+  const session = context && (context.analysisSession || context.session);
+  const replies = array(session && session.initialResults).filter((reply) => reply && reply.ok !== false && text(reply.text).length >= 12);
+  const diffAnalyses = array(session && session.diffAnalyses);
+  const diffs = array(session && session.diffs);
+  return replies.length >= 2 || diffAnalyses.length >= 1 || diffs.length >= 1;
 }
 
 function buildBlockedCopy(data, taskType, decisionObject) {
@@ -299,6 +389,67 @@ function alignBlockedScenarioPayload(data, taskType) {
   };
 }
 
+function applyAiCrossAnalysisGate(data, validation, summary) {
+  const conclusion = data.executive_conclusion || {};
+  const decision = data.scenario_decision || {};
+  const diagnosis = data.source_diagnosis || {};
+  const baseSentence =
+    softenAiOnlyStrongText(conclusion.one_sentence) ||
+    softenAiOnlyStrongText(diagnosis.retained_judgment) ||
+    'AI 交叉研判已形成可用裁决，当前报告按多模型回答、差异追问和污染剔除结果给出判断。';
+  const scoreValue = Number(conclusion.confidence_score);
+
+  data.executive_conclusion = {
+    ...conclusion,
+    status: text(conclusion.status, 'strong'),
+    confidence_score: Math.max(65, Math.min(Number.isFinite(scoreValue) ? scoreValue : 76, 88)),
+    confidence_label: 'AI交叉研判',
+    one_sentence: /^AI/.test(baseSentence) ? baseSentence : `AI交叉研判：${baseSentence}`,
+    core_tension:
+      text(conclusion.core_tension) ||
+      '多模型回答已经形成可用判断，报告依据为模型回答、差异追问与污染剔除，而非外部信源检索。',
+    largest_uncertainty:
+      text(conclusion.largest_uncertainty) ||
+      '第一版暂以 AI 交叉研判为准；后续接入可信来源后可升级为外部证据裁决。',
+  };
+
+  data.scenario_decision = {
+    ...decision,
+    direct_verdict: softenAiOnlyStrongText(decision.direct_verdict) || '按多模型 AI 交叉研判输出当前裁决。',
+    recommended_action:
+      softenAiOnlyStrongText(decision.recommended_action) ||
+      '先按 AI 交叉研判结论给用户可执行建议；可信来源接入后再做证据增强。',
+    do_not_overread: Array.from(
+      new Set([
+        ...array(decision.do_not_overread),
+        '当前结论来自 AI 交叉研判；不要误写成已接入外部可信来源。',
+        '事实项可以按模型一致性和追问结果裁决，但来源字段应标注 AI 模型或待后续可信来源增强。',
+      ])
+    ),
+  };
+
+  data.evidence_binding_summary = {
+    ...summary,
+    analysis_basis: 'ai_cross_analysis',
+    external_sources_connected: false,
+  };
+  data.final_actions = Array.from(
+    new Set([
+      ...array(data.final_actions),
+      '第一版按 AI 交叉研判输出可用结论。',
+      '后续如接入可信来源，再把 AI 裁决升级为外部证据裁决。',
+    ])
+  );
+  data.quality_gate = {
+    ok: true,
+    level: 'ai_cross_analysis_pass',
+    reason: 'ai_cross_analysis_available',
+    evidence_summary: data.evidence_binding_summary,
+    errors: validation.errors,
+    warnings: Array.from(new Set([...validation.warnings, 'conclusion_based_on_ai_cross_analysis_only'])),
+  };
+}
+
 function alignBlockedEvidenceFunnel(data, summary) {
   const funnel = data.evidence_funnel || {};
   const bound = Number(summary && summary.bound) || 0;
@@ -363,7 +514,8 @@ function downgradeForInsufficientEvidence(report, validation, summary) {
   };
 }
 
-function applyReportQualityGate(report) {
+function applyReportQualityGate(report, context) {
+  const externalEvidenceEnabled = isExternalEvidenceEnabled(context);
   const data = markPlaceholderFields(scrubMisleadingVerifiedText(clone(report)));
   const cleaned = scrubCrossScenarioResidue(data, {
     taskType: taskTypeOf(data),
@@ -377,14 +529,14 @@ function applyReportQualityGate(report) {
   const summary = evidenceSummary(cleaned);
   const evidenceMissing = summary.evidence_sources === 0 || (summary.claims > 0 && summary.bound === 0);
   const missingScenarioPayload = validation.warnings.some((warning) => String(warning).startsWith('scenario_payload.'));
-  const aiAnalysisOnly = evidenceMissing && hasAiAnalysisBasis(cleaned);
+  const aiAnalysisOnly = evidenceMissing && (hasAiAnalysisBasis(cleaned) || hasSessionAiBasis(context));
   const shouldDowngrade =
     !aiAnalysisOnly &&
     (needsPublicOpinionDowngrade(cleaned, summary) ||
       (evidenceMissing && (hasStrongConclusion(cleaned) || validation.errors.length > 0 || missingScenarioPayload)));
 
   if (aiAnalysisOnly) {
-    applyAiAnalysisOnlyGate(cleaned, validation, summary);
+    applyAiCrossAnalysisGate(cleaned, validation, summary);
   } else if (shouldDowngrade) {
     downgradeForInsufficientEvidence(cleaned, validation, summary);
   } else {
@@ -401,7 +553,7 @@ function applyReportQualityGate(report) {
     taskType: taskTypeOf(cleaned),
     question: userQuestionText(cleaned),
   });
-  return cleaned;
+  return externalEvidenceEnabled ? cleaned : applyDisabledExternalEvidencePolicy(cleaned);
 }
 
 module.exports = {
