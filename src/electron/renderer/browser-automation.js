@@ -5,6 +5,7 @@ function buildFillScript(text, cfg) {
     submitButtonSelectors: cfg.submitButtonSelectors || [],
     useComposerSubmit: !!cfg.useComposerSubmit,
     syncInputAggressive: !!cfg.syncInputAggressive,
+    strictInputSync: !!cfg.strictInputSync,
     minimalSubmitClicks: !!cfg.minimalSubmitClicks,
     submitViaEnter: !!cfg.submitViaEnter,
     preSubmitDelayMs: Math.max(0, Number(cfg.preSubmitDelayMs) || 0),
@@ -15,6 +16,7 @@ function buildFillScript(text, cfg) {
     var submitSelectors = ${JSON.stringify(meta.submitButtonSelectors)};
     var useComposerSubmit = ${JSON.stringify(meta.useComposerSubmit)};
     var syncInputAggressive = ${JSON.stringify(meta.syncInputAggressive)};
+    var strictInputSync = ${JSON.stringify(meta.strictInputSync)};
     var minimalSubmitClicks = ${JSON.stringify(meta.minimalSubmitClicks)};
     var submitViaEnter = ${JSON.stringify(meta.submitViaEnter)};
     var preSubmitDelayMs = ${JSON.stringify(meta.preSubmitDelayMs)};
@@ -42,6 +44,11 @@ function buildFillScript(text, cfg) {
       return false;
     }
     function dispatchSyncEvents(el, val) {
+      if (strictInputSync) {
+        try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e0) {}
+        try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e00) {}
+        return;
+      }
       try { el.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: val })); } catch (e1) {}
       try { el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: val })); } catch (e2) {}
       try { el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: val })); } catch (e3) {}
@@ -62,6 +69,36 @@ function buildFillScript(text, cfg) {
         if (current !== val) {
           try { el.textContent = val; } catch (e0) {}
         }
+      }
+    }
+    function readInputText(el) {
+      if (!el) return '';
+      if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') return el.value || '';
+      return el.innerText || el.textContent || '';
+    }
+    function selectEditableContents(el) {
+      if (!el) return;
+      try {
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (e0) {}
+    }
+    function insertTextOnce(el, val) {
+      if (!el) return;
+      el.focus();
+      if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+        nativeValueSetter(el, val);
+        dispatchSyncEvents(el, val);
+        return;
+      }
+      try { document.execCommand('insertText', false, val); } catch (e0) {}
+      dispatchSyncEvents(el, val);
+      if ((readInputText(el) || '').replace(/\\s+/g, '') !== String(val || '').replace(/\\s+/g, '')) {
+        try { el.textContent = val; } catch (e1) {}
+        dispatchSyncEvents(el, val);
       }
     }
     function pickLargestVisibleTextarea() {
@@ -199,7 +236,9 @@ function buildFillScript(text, cfg) {
       nativeValueSetter(el, '');
       dispatchSyncEvents(el, '');
       await sleep(50);
-      try { document.execCommand('insertText', false, text); } catch (e3) {}
+      if (!strictInputSync) {
+        try { document.execCommand('insertText', false, text); } catch (e3) {}
+      }
       nativeValueSetter(el, text);
       dispatchSyncEvents(el, text);
       forceExactText(el, text);
@@ -213,10 +252,19 @@ function buildFillScript(text, cfg) {
         dispatchSyncEvents(el, text);
         forceExactText(el, text);
       }
+    } else if (strictInputSync && (el.isContentEditable || el.getAttribute('role') === 'textbox')) {
+      selectEditableContents(el);
+      try { document.execCommand('delete', false, null); } catch (e5a) {}
+      try { el.textContent = ''; } catch (e5b) {}
+      dispatchSyncEvents(el, '');
+      await sleep(50);
+      insertTextOnce(el, text);
     } else if (el.isContentEditable || el.getAttribute('role') === 'textbox') {
       try { el.innerHTML = ''; } catch (e5) {}
       el.focus();
-      try { document.execCommand('insertText', false, text); } catch (e6) {}
+      if (!strictInputSync) {
+        try { document.execCommand('insertText', false, text); } catch (e6) {}
+      }
       try { el.textContent = text; } catch (e7) {}
       dispatchSyncEvents(el, text);
       forceExactText(el, text);

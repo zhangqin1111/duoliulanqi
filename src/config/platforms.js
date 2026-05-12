@@ -55,6 +55,8 @@ module.exports = [
     accent: '#4d7bff',
     avatarBg: '#eef3ff',
     avatarFg: '#3167df',
+  }, {
+    strictInputSync: true,
   }),
   platform('doubao', 'Doubao', 'https://www.doubao.com/', {
     avatar: 'D',
