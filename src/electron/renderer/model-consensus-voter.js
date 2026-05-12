@@ -39,9 +39,21 @@
   function hasEvidenceSignal(value) {
     const raw = text(value);
     return (
-      /(\d{4}[年.-]\d{1,2}|\d{1,2}[月.-]\d{1,2}|官方|公告|声明|报道|法院|判决|财报|工信部|外交部|新华社|官网|监管|价格|指导价|成交价|公里|版本|型号|配置)/.test(raw) ||
+      /(\d{4}[-年]\d{1,2}|\d{1,2}[月-]\d{1,2}|官方|公告|声明|报道|法院|判决|财报|工信部|外交部|新华社|政府网|官网|监管|价格|指导价|成交价|公里|版本|型号|配置)/.test(raw) ||
       /https?:\/\//i.test(raw)
     );
+  }
+
+  function hasSearchSignal(value) {
+    const raw = text(value);
+    return (
+      /(搜索|联网|网络|最新|官网|官方网站|官方渠道|官方发布|官方宣布|外交部|新华社|中国政府网|公告|声明|报道|可核验|已核验)/.test(raw) ||
+      /https?:\/\//i.test(raw)
+    );
+  }
+
+  function isNoSearchAdmission(value) {
+    return /(未联网|无法联网|不能搜索|无法搜索|仅基于已有知识|知识截止)/.test(text(value));
   }
 
   function collectClaimsFromDiff(diff) {
@@ -67,6 +79,23 @@
       });
     });
     return Array.from(latestByModel.values());
+  }
+
+  function collectFollowupEvidenceByModel(analysis) {
+    const latestByModel = new Map();
+    array(analysis && analysis.followupRounds).forEach((round) => {
+      array(round && round.replies).forEach((reply) => {
+        if (!reply || !reply.ok || !text(reply.text)) return;
+        latestByModel.set(modelName(reply.name), {
+          model: text(reply.name),
+          text: clip(reply.text, 720),
+          searched: hasSearchSignal(reply.text) && !isNoSearchAdmission(reply.text),
+          noSearchAdmission: isNoSearchAdmission(reply.text),
+          source: `followup_round_${round.round || ''}`,
+        });
+      });
+    });
+    return latestByModel;
   }
 
   function clusterClaims(claims) {
@@ -118,7 +147,7 @@
       }
       samples += 1;
       const matchedMajority = array(majority.models).some((claimModel) => modelName(claimModel) === name);
-      if (matchedMajority) score += 12;
+      if (matchedMajority) score += modelClaim.searched ? 16 : 12;
       else if (hasEvidenceSignal(modelClaim.claim)) score -= 4;
       else score -= 18;
     });
@@ -135,8 +164,28 @@
     const majorityThreshold = modelCount >= 3 ? Math.floor(modelCount / 2) + 1 : modelCount;
     const analyses = array(diffAnalyses).map((item) => {
       const diff = item && item.diff ? item.diff : {};
-      const allClaims = [...collectClaimsFromDiff(diff), ...collectClaimsFromFollowups(item)];
+      const followupEvidence = collectFollowupEvidenceByModel(item);
+      const allClaims = collectClaimsFromDiff(diff).map((claim) => {
+        const evidence = followupEvidence.get(modelName(claim.model));
+        return {
+          ...claim,
+          followupEvidence: evidence || null,
+          searched: !!(evidence && evidence.searched),
+          noSearchAdmission: !!(evidence && evidence.noSearchAdmission),
+        };
+      });
       const clusters = clusterClaims(allClaims);
+      clusters.forEach((cluster) => {
+        const searchedModels = array(cluster.models).filter((name) => {
+          const evidence = followupEvidence.get(modelName(name));
+          return evidence && evidence.searched;
+        });
+        cluster.searchedModels = searchedModels;
+        cluster.searchConfirmedSupport = searchedModels.length;
+        cluster.evidenceSignals += searchedModels.length;
+        cluster.evidenceRatio = cluster.claims.length ? cluster.evidenceSignals / cluster.claims.length : 0;
+      });
+      const followupClaims = collectClaimsFromFollowups(item);
       const majorityCluster = clusters.find((cluster) => cluster.support >= majorityThreshold) || null;
       const isolatedClusters = clusters.filter((cluster) => cluster.support === 1 && modelCount >= 3);
       const evidenceBackedMinorities = clusters.filter(
@@ -165,6 +214,8 @@
               representative: majorityCluster.representative,
               support: majorityCluster.support,
               models: majorityCluster.models,
+              searched_models: majorityCluster.searchedModels || [],
+              search_confirmed_support: majorityCluster.searchConfirmedSupport || 0,
             }
           : null,
         minority_candidates: evidenceBackedMinorities.map((cluster) => ({
@@ -186,7 +237,11 @@
           support: cluster.support,
           models: cluster.models,
           evidence_ratio: Number(cluster.evidenceRatio.toFixed(2)),
+          searched_models: cluster.searchedModels || [],
+          search_confirmed_support: cluster.searchConfirmedSupport || 0,
         })),
+        followupEvidence: Array.from(followupEvidence.values()),
+        followupClaims,
         allClaims,
       };
     });
@@ -214,8 +269,190 @@
     };
   }
 
+  function normalizeComparable(value) {
+    return text(value).toLowerCase().replace(/[^\u4e00-\u9fa5a-z0-9]+/g, '');
+  }
+
+  function itemText(item) {
+    if (!item) return '';
+    if (typeof item === 'string') return item;
+    return [item.source, item.type, item.content, item.reason, item.claim, item.model, item.cleaned_conclusion]
+      .map(text)
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  function matchesRepresentative(value, representative) {
+    const left = itemText(value);
+    const right = text(representative);
+    if (!left || !right) return false;
+    const l = normalizeComparable(left);
+    const r = normalizeComparable(right);
+    const head = r.slice(0, Math.min(24, r.length));
+    return (!!head && l.includes(head)) || similarity(left, right) >= 0.18;
+  }
+
+  function keyFactTokens(value) {
+    const raw = text(value);
+    const tokens = raw.match(/特朗普|访华|外交部|新华社|中国政府网|官方|公告|宣布|\d{4}年|\d{4}|\d{1,2}月\d{1,2}日|\d{1,2}日至\d{1,2}日|\d{1,2}月/g) || [];
+    return Array.from(new Set(tokens));
+  }
+
+  function sharesKeyFacts(value, representative) {
+    const left = itemText(value);
+    const tokens = keyFactTokens(representative);
+    if (!left || tokens.length < 2) return false;
+    const overlap = tokens.filter((token) => left.includes(token)).length;
+    return overlap >= Math.min(2, tokens.length);
+  }
+
+  function accusesClaim(value) {
+    return /(幻觉|虚构|不存在|未官宣|无官方|未发布|不成立|前提不成立|缺乏可验证|未核验|错误|污染)/.test(itemText(value));
+  }
+
+  function contradictsProtectedConsensus(value, representative) {
+    if (!accusesClaim(value)) return false;
+    return matchesRepresentative(value, representative) || sharesKeyFacts(value, representative);
+  }
+
+  function majorityAnalyses(consensus) {
+    return array(consensus && consensus.analyses).filter(
+      (analysis) => analysis && analysis.status === 'majority_consensus' && analysis.majority
+    );
+  }
+
+  function isProtectedModel(source, majority) {
+    const sourceName = modelName(source);
+    return !!sourceName && array(majority && majority.models).some((name) => modelName(name) === sourceName);
+  }
+
+  function protectPollutionWithConsensus(session) {
+    if (!session || !session.pollution || !session.consensus) return null;
+    const protectedMajorities = majorityAnalyses(session.consensus).filter((analysis) => {
+      const majority = analysis.majority || {};
+      return majority.support >= (analysis.majority_threshold || session.consensus.majority_threshold || 2);
+    });
+    if (!protectedMajorities.length) return null;
+
+    const pollution = session.pollution;
+    const restored = [];
+    const protectedTexts = protectedMajorities.map((analysis) => ({
+      diff_id: analysis.diff_id,
+      topic: analysis.topic,
+      representative: analysis.majority.representative,
+      support: analysis.majority.support,
+      models: analysis.majority.models,
+      searched_models: analysis.majority.searched_models || [],
+    }));
+
+    pollution.pollution_removed = array(pollution.pollution_removed).filter((item) => {
+      const hit = protectedTexts.find(
+        (entry) =>
+          isProtectedModel(item && item.source, { models: entry.models }) ||
+          matchesRepresentative(item, entry.representative) ||
+          contradictsProtectedConsensus(item, entry.representative)
+      );
+      if (!hit) return true;
+      restored.push({ ...hit, removedItem: item });
+      return false;
+    });
+
+    pollution.discarded_claims = array(pollution.discarded_claims).filter((item) => {
+      const hit = protectedTexts.find(
+        (entry) => matchesRepresentative(item, entry.representative) || contradictsProtectedConsensus(item, entry.representative)
+      );
+      if (!hit) return true;
+      restored.push({ ...hit, discardedItem: item });
+      return false;
+    });
+
+    pollution.kept_claims = array(pollution.kept_claims).filter((item) => {
+      return !protectedTexts.some((entry) => contradictsProtectedConsensus(item, entry.representative));
+    });
+    protectedTexts.forEach((entry) => {
+      const label = `CONSENSUS_LOCKED: ${entry.representative}（支持模型：${array(entry.models).join('、')}；联网/官方信号：${array(entry.searched_models).join('、') || '未显式标注'}）`;
+      if (!pollution.kept_claims.some((item) => text(item) === label)) {
+        pollution.kept_claims.unshift(label);
+      }
+    });
+
+    pollution.root_causes = array(pollution.root_causes).filter((item) => {
+      return !protectedTexts.some((entry) => contradictsProtectedConsensus(item, entry.representative));
+    });
+
+    pollution.consensus_guard = {
+      applied: true,
+      reason:
+        'Majority consensus from multiple AI witnesses must not be discarded by a later single-judge pollution pass when external evidence is disabled.',
+      protected_majorities: protectedTexts,
+      restored_count: restored.length,
+      restored,
+    };
+    return pollution.consensus_guard;
+  }
+
+  function protectSelfCleansingWithConsensus(session) {
+    if (!session || !session.selfCleansing || !session.consensus) return null;
+    const merged = session.selfCleansing.merged;
+    if (!merged) return null;
+    const protectedMajorities = majorityAnalyses(session.consensus);
+    if (!protectedMajorities.length) return null;
+    const protectedTexts = protectedMajorities.map((analysis) => ({
+      diff_id: analysis.diff_id,
+      topic: analysis.topic,
+      representative: analysis.majority.representative,
+      support: analysis.majority.support,
+      models: analysis.majority.models,
+      searched_models: analysis.majority.searched_models || [],
+    }));
+
+    array(merged.per_model).forEach((item) => {
+      const model = item && item.model;
+      const protectedForModel = protectedTexts.filter((entry) => isProtectedModel(model, { models: entry.models }));
+      if (!protectedForModel.length) return;
+      item.rejected = array(item.rejected).filter((rejected) => {
+        return !protectedForModel.some(
+          (entry) => matchesRepresentative(rejected, entry.representative) || contradictsProtectedConsensus(rejected, entry.representative)
+        );
+      });
+      item.accepted = array(item.accepted);
+      protectedForModel.forEach((entry) => {
+        const accepted = `CONSENSUS_LOCKED: ${entry.representative}`;
+        if (!item.accepted.some((value) => matchesRepresentative(value, entry.representative) || text(value) === accepted)) {
+          item.accepted.unshift(accepted);
+        }
+      });
+    });
+
+    merged.consensus_pollution = array(merged.consensus_pollution).filter((item) => {
+      return !protectedTexts.some(
+        (entry) => matchesRepresentative(item, entry.representative) || contradictsProtectedConsensus(item, entry.representative)
+      );
+    });
+    merged.contested_pollution = array(merged.contested_pollution);
+    merged.consensus_guard = {
+      applied: true,
+      protected_majorities: protectedTexts,
+      reason: 'Self-cleansing merge cannot reject a protected majority consensus while external evidence is disabled.',
+    };
+    return merged.consensus_guard;
+  }
+
+  function applyConsensusGuard(session) {
+    const pollutionGuard = protectPollutionWithConsensus(session);
+    const selfCleansingGuard = protectSelfCleansingWithConsensus(session);
+    if (!pollutionGuard && !selfCleansingGuard) return null;
+    session.consensusGuard = {
+      applied: true,
+      pollutionGuard,
+      selfCleansingGuard,
+    };
+    return session.consensusGuard;
+  }
+
   global.DuoliModelConsensusVoter = {
     buildConsensus,
+    applyConsensusGuard,
     similarity,
   };
 })(window);

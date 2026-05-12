@@ -473,6 +473,12 @@
         root_causes: [],
         unresolved: [],
       });
+      if (global.DuoliModelConsensusVoter && typeof global.DuoliModelConsensusVoter.applyConsensusGuard === 'function') {
+        const consensusGuard = global.DuoliModelConsensusVoter.applyConsensusGuard(session);
+        if (consensusGuard) {
+          auditRecord(session, 'consensus_vote', 'after_pollution_guard', { consensusGuard, pollution: session.pollution }, 'ok');
+        }
+      }
       if (externalEvidenceEnabled && global.DuoliEvidenceBoundaryGuard && typeof global.DuoliEvidenceBoundaryGuard.apply === 'function') {
         global.DuoliEvidenceBoundaryGuard.apply(session);
         auditRecord(session, 'evidence_boundary', 'after_pollution_guard', {
@@ -486,6 +492,15 @@
       renderAnalysisProgress(session, '让多家 AI 自审并剔除自身污染');
       try {
         session.selfCleansing = await runSelfCleansingRound(session, modelReplies, session.pollution);
+        if (global.DuoliModelConsensusVoter && typeof global.DuoliModelConsensusVoter.applyConsensusGuard === 'function') {
+          const consensusGuard = global.DuoliModelConsensusVoter.applyConsensusGuard(session);
+          if (consensusGuard) {
+            auditRecord(session, 'consensus_vote', 'after_self_cleansing_guard', {
+              consensusGuard,
+              selfCleansing: session.selfCleansing,
+            }, 'ok');
+          }
+        }
       } catch (e) {
         session.selfCleansing = { audits: [], merged: null, error: (e && e.message) || String(e) };
         auditRecord(session, 'self_cleansing', 'error', { error: session.selfCleansing.error }, 'error');
