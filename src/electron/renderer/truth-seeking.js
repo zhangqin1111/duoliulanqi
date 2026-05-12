@@ -291,7 +291,7 @@
       const api = getApi();
       const resultsPreloaded = opt && Array.isArray(opt.results);
       const initialResults = resultsPreloaded ? opt.results : await deps.runConcurrentAsk(question);
-      const modelReplies = core().normalizeModelResults(initialResults);
+      let modelReplies = core().normalizeModelResults(initialResults);
       const originalQuestion = String((opt && opt.originalQuestion) || question || '').trim();
       const externalEvidenceEnabled = !!(opt && opt.externalEvidenceEnabled === true);
       const session = {
@@ -314,6 +314,7 @@
         evidencePack: null,
         createdAt: new Date().toISOString(),
         initialResults: modelReplies,
+        freshSearchResults: [],
         diffs: [],
         diffAnalyses: [],
         pollution: null,
@@ -331,6 +332,44 @@
         highRisk: session.highRisk,
         evidencePlan: session.evidencePlan,
       });
+
+      if (opt && opt.skipFreshSearch) {
+        auditRecord(session, 'fresh_search', 'skipped', { reason: 'skipFreshSearch option enabled' });
+      } else if (deps.chatPlatforms().length && global.DuoliFreshSearchTrigger) {
+        try {
+          const freshSearch = await global.DuoliFreshSearchTrigger.run({
+            deps,
+            session,
+            modelReplies,
+            auditRecord,
+            auditTimer,
+            compactReplies,
+            stageAskOptions,
+            stageFailureLabel,
+          });
+          session.freshSearchResults = freshSearch.replies || [];
+          modelReplies = freshSearch.mergedReplies || modelReplies;
+          session.initialResults = modelReplies;
+          auditRecord(
+            session,
+            'fresh_search',
+            'merged_into_model_replies',
+            {
+              freshSearchResults: compactReplies(session.freshSearchResults),
+              mergedReplies: compactReplies(modelReplies),
+            },
+            'ok'
+          );
+          setSession(session);
+        } catch (e) {
+          session.freshSearchResults = [];
+          auditRecord(session, 'fresh_search', 'error', { error: (e && e.message) || String(e) }, 'error');
+          setSession(session);
+        }
+      } else {
+        auditRecord(session, 'fresh_search', 'skipped', { reason: 'no browser chat platforms' });
+      }
+
       auditRecord(session, 'dispatch', 'model_replies_collected', {
         resultsPreloaded,
         replies: compactReplies(modelReplies),

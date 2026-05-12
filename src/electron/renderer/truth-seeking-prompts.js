@@ -66,9 +66,9 @@
   function buildDiffFollowupQuestion(question, diff, round, taskRoute) {
     const workflow = resolveWorkflow(taskRoute);
     if (workflow && typeof workflow.buildDiffFollowupQuestion === 'function') {
-      return appendFollowupSearchProtocol(workflow.buildDiffFollowupQuestion({ question, diff, round, taskRoute }));
+      return workflow.buildDiffFollowupQuestion({ question, diff, round, taskRoute });
     }
-    return appendFollowupSearchProtocol([
+    return [
       `原始问题：${question}`,
       '',
       `现在多个 AI 在「${diff.topic}」上出现不一致。`,
@@ -81,7 +81,7 @@
       '请只回答“为什么不一致”，不要重新回答原始问题。',
       '必须区分以下原因：事实来源不同、时间点不同、问题口径不同、推理链不同、安全策略或平台限制、AI 幻觉或无证据推测、只是表达不同。',
       '最后给出你认为最可能的差异源头，以及应该剔除哪些污染因素。',
-    ].join('\n'));
+    ].join('\n');
   }
 
   function buildSecondMergePrompt(question, diff, followupRounds) {
